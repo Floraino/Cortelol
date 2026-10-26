@@ -4,4 +4,6 @@ Cortelol is MIT licensed. The separately bundled `ffmpeg.exe` and `ffprobe.exe` 
 
 Before distributing an installer, package the **exact corresponding source** for this static build, including FFmpeg, libx264, every other statically linked library, build scripts and configuration. Publish that source archive alongside the installer on the same download page. The release script refuses to build without the archive and its pinned SHA-256 in `ffmpeg-win64.json`. Review its completeness manually; a matching hash alone cannot establish source compliance.
 
+For GitHub Releases, distribute the verified archive as numbered files below the per-asset size limit and include the [reassembly instructions](SOURCE-REASSEMBLY.md) and checksum list. The split files reproduce the same pinned archive; splitting does not replace the manual source-completeness review.
+
 The installed application includes this notice, Cortelol's MIT license, and the FFmpeg archive's GPL text. The release download must also include the source archive and describe the build provenance. See [FFmpeg's license guidance](https://ffmpeg.org/legal.html), [BtbN build definitions](https://github.com/BtbN/FFmpeg-Builds), and the [pinned binary release](https://github.com/BtbN/FFmpeg-Builds/releases/tag/autobuild-2026-10-25-13-00).
