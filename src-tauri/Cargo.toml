@@ -1,0 +1,45 @@
+[package]
+name = "cortelol"
+version = "0.1.0"
+license = "MIT"
+description = "Open source podcast clipping desktop app"
+edition = "2024"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "cortelol_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri-plugin-dialog = "2"
+rusqlite = { version = "0.41.0", features = ["bundled"] }
+keyring = "4.2.0"
+reqwest = { version = "0.13.5", default-features = false, features = ["json", "multipart", "rustls"] }
+tokio = { version = "1.54.1", features = ["process", "fs", "time", "macros", "sync", "rt-multi-thread", "io-util"] }
+tokio-util = { version = "0.7.20", features = ["rt"] }
+tempfile = "3.27.0"
+sha2 = "0.10"
+unicode-normalization = "0.1"
+base64 = "0.22"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62.2", features = ["Foundation", "Foundation_Collections", "Graphics_Imaging", "Media_FaceAnalysis", "Storage", "Storage_Streams", "Win32_System_WinRT"] }
+
+
+# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

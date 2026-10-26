@@ -1,0 +1,26 @@
+.publish-workspace { margin-top: 46px; }
+.publish-grid { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(300px, 1fr); gap: 16px; }
+.publish-preview-panel, .publish-review-panel, .publish-checklist { border: 1px solid #e9eef529; border-radius: 12px; background: #e9eef507; padding: 20px; min-width: 0; }
+.publish-preview-panel { display: flex; flex-direction: column; align-items: center; }
+.publish-preview { display: block; width: min(100%, 290px); max-height: 510px; aspect-ratio: 9 / 16; background: #000; border-radius: 8px; }
+.publish-path { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; }
+.publish-hint { color: var(--muted); font-size: 11px; line-height: 1.55; }
+.publish-review-panel h3, .publish-checklist h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 18px; font-size: 16px; }
+.publish-review-panel h3 svg, .publish-checklist h3 svg { color: var(--accent); }
+.publish-field { display: block; margin: 0 0 16px; font-size: 12px; font-weight: 600; }
+.publish-field select, .publish-field textarea { display: block; width: 100%; margin-top: 7px; padding: 10px; border: 1px solid #e9eef53d; border-radius: 8px; background: #11151b; color: var(--primary); font: inherit; }
+.publish-field textarea { min-height: 95px; resize: vertical; }
+.publish-field select:focus-visible, .publish-field textarea:focus-visible, .publish-options input:focus-visible, .publish-checklist input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.publish-account { display: flex; align-items: center; gap: 6px; color: var(--success); font-size: 12px; }
+.publish-unavailable { color: var(--muted); border: 1px solid #7aa7ff48; background: #7aa7ff0d; border-radius: 8px; padding: 12px; font-size: 12px; line-height: 1.6; }
+.publish-review-panel .replace-button, .publish-actions .replace-button { display: inline-flex; align-items: center; gap: 7px; }
+.publish-options { display: grid; gap: 9px; margin-bottom: 10px; }
+.publish-options label, .publish-checklist label { display: flex; align-items: flex-start; gap: 9px; font-size: 12px; line-height: 1.5; }
+.publish-options input, .publish-checklist input { accent-color: var(--accent); margin: 2px 0 0; }
+.publish-checklist { display: grid; gap: 11px; margin-top: 16px; }
+.publish-checklist h3 { margin-bottom: 3px; }
+.publish-checklist a { color: var(--secondary); display: inline-flex; align-items: center; gap: 3px; }
+.publish-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 10px; }
+.publish-state { color: var(--success); font-size: 12px; margin: 5px 0 0; }
+.publish-error { color: var(--error); font-size: 12px; margin: 5px 0 0; }
+@media (max-width: 900px) { .publish-grid { grid-template-columns: 1fr; } .publish-preview { max-height: 350px; } }

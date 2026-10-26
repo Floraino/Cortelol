@@ -1,0 +1,107 @@
+# Windows release checklist
+
+This is a release gate, not a record of a shipped release. Cortelol's own source is MIT licensed. The export pipeline currently requests `libx264`, so the Windows FFmpeg distribution must include that encoder and carry the resulting GPL obligations. Keep the exact media binary, its license materials, and Cortelol's source license distinct in the release package.
+
+## Chosen Windows package
+
+- Target **Windows x64**, built with the `x86_64-pc-windows-msvc` Rust target. Use **NSIS** with a current-user install, so an administrator account is not required.
+- Include the **offline WebView2 installer**. Tauri documents this as an approximately 127 MB addition that lets an otherwise clean machine install without network access. The application can use the system's serviced WebView2 after installation, rather than pinning a fixed runtime. [Tauri Windows installer guide](https://v2.tauri.app/distribute/windows-installer/).
+- Use the fixed BtbN Windows x64 GPL static archive in [legal/ffmpeg-win64.json](legal/ffmpeg-win64.json): release `autobuild-2026-10-25-13-00`, FFmpeg `n8.1.3-24-g92611900bb-20261025`, archive SHA-256 `0ed7e19d34ca040c0179068ccc6cd6d7f2217d2bcbf7604e2225e271e79bee22`. The manifest also pins the extracted FFmpeg, FFprobe, and GPL license hashes. The build has `libx264`, `--enable-gpl`, and `--enable-version3`; its configuration is recorded in [legal/FFMPEG-BUILDCONF.txt](legal/FFMPEG-BUILDCONF.txt).
+- The release-only Tauri overlay `src-tauri/release.windows.conf.json` bundles two sidecars, `ffmpeg.exe` and `ffprobe.exe`, and includes the MIT/GPL notices as installed resources. Development still uses the local `PATH`. [Tauri sidecar guide](https://v2.tauri.app/develop/sidecar/).
+
+Run the release guard from a clean Windows x64 checkout after obtaining the pinned binary archive and assembling the exact corresponding-source archive:
+
+```powershell
+powershell -NoProfile -File scripts/Build-WindowsRelease.ps1 -FfmpegArchive C:\release-inputs\ffmpeg-n8.1.3-24-g92611900bb-win64-gpl-8.1.zip -SourceArchive C:\release-inputs\ffmpeg-corresponding-source.zip -CheckOnly
+powershell -NoProfile -File scripts/Build-WindowsRelease.ps1 -FfmpegArchive C:\release-inputs\ffmpeg-n8.1.3-24-g92611900bb-win64-gpl-8.1.zip -SourceArchive C:\release-inputs\ffmpeg-corresponding-source.zip
+```
+
+The assembled source archive is `ffmpeg-corresponding-source.zip`, SHA-256 `3647a98eb668736fee85a92e14cc0f379213e7051983040e2260beae8ccec675` (2,224,619,090 bytes). It contains `SOURCE-MANIFEST.md`, `ffmpeg/`, `x264/`, `BtbN-FFmpeg-Builds/`, and `dependency-sources/` paths. The script checks the pinned hashes and structural paths; it cannot replace a source-compliance review of **all** libraries statically linked into both executables. It stages the NSIS installer, source archive, notices, and checksums under `release-artifacts/<version>/` after a successful build. The `release-artifacts` directory is a candidate for inspection, not a published release.
+
+The matching source inputs can be assembled in WSL Ubuntu with Docker and Python 3. The BtbN tag and FFmpeg source commit are recorded in the manifest; the source assembler checks both, the FFmpeg tarball hash, and the current dependency cache before producing a deterministic ZIP. Use an output path outside the repository:
+
+```sh
+git clone --depth 1 --branch autobuild-2026-10-25-13-00 https://github.com/BtbN/FFmpeg-Builds.git /var/tmp/cortelol-ffmpeg/BtbN-FFmpeg-Builds
+cd /var/tmp/cortelol-ffmpeg/BtbN-FFmpeg-Builds
+docker pull ghcr.io/btbn/ffmpeg-builds/base@sha256:91eaaaf32f3f98464e99faf1062fab8ab99a23d0b499c72b51a02ec9137b06a0
+docker tag ghcr.io/btbn/ffmpeg-builds/base@sha256:91eaaaf32f3f98464e99faf1062fab8ab99a23d0b499c72b51a02ec9137b06a0 ghcr.io/btbn/ffmpeg-builds/base:latest
+./download.sh && git rev-parse HEAD > /var/tmp/cortelol-ffmpeg/download-complete.txt
+curl -fL https://github.com/FFmpeg/FFmpeg/archive/92611900bb112123e9bf997fdcc2d78e4c4922fc.tar.gz -o /var/tmp/cortelol-ffmpeg/ffmpeg-92611900bb112123e9bf997fdcc2d78e4c4922fc.tar.gz
+python3 /path/to/Cortelol/scripts/Assemble-FfmpegSource.py --repo /var/tmp/cortelol-ffmpeg/BtbN-FFmpeg-Builds --ffmpeg-source /var/tmp/cortelol-ffmpeg/ffmpeg-92611900bb112123e9bf997fdcc2d78e4c4922fc.tar.gz --download-complete /var/tmp/cortelol-ffmpeg/download-complete.txt --output /var/tmp/cortelol-ffmpeg/ffmpeg-corresponding-source.zip
+```
+
+Replace the example workspace path with the actual checkout path. Review the ZIP's `SOURCE-MANIFEST.md`, current cache alias map, patches, licenses, and build configuration against the pinned binaries. The BtbN script currently pulls `ghcr.io/btbn/ffmpeg-builds/base:latest`; archive the image digest used for the source collection and check whether the original binary build used the same toolchain. Do not publish merely because the archive was assembled.
+
+Source collection completed on 2026-10-25 in WSL Ubuntu at `/var/tmp/cortelol-release-inputs/BtbN-FFmpeg-Builds`; the successful tagged run is logged at `/var/tmp/cortelol-release-inputs/download-disk.log`. The checkout is commit `937868360a21d711ec94a33f5591d345ad9b7754`, and the FFmpeg source tarball for commit `92611900bb112123e9bf997fdcc2d78e4c4922fc` has SHA-256 `12c02b1eaf52ec310acae385e76810f4bb71bacc21cacc01d6d9e95ac3b83bbb`. The Docker base image digest used for collection is recorded in `legal/ffmpeg-win64.json`. An older release's verified source cache accelerated the download, but the exact tagged `download.sh` completed and refreshed its content-addressed aliases. The assembled ZIP has 127 dependency source tarballs, the tagged build scripts and patches, FFmpeg source, x264 source, and build configuration; ZIP integrity and the positive Windows `-CheckOnly` release guard passed. The original binary build's toolchain identity and complete linked-license correspondence still require human review.
+
+A local NSIS candidate was built with the full guard on 2026-10-25. Its filename is `Cortelol_0.1.0_x64-setup.exe`, size 315,146,087 bytes, and SHA-256 `925b8c0f5476d0310d4536bc7862c928936ce6ed0363ad256c6431db48e986c1`; the source archive and notices are beside it in the ignored `release-artifacts/n8.1.3-24-g92611900bb-20261025/` directory. This candidate came from an uncommitted development tree and has not had a clean VM acceptance or final source/license review. It is **not** a distributable release artifact. Rebuild from a clean, tagged source tree after those gates are resolved.
+
+A newer local test candidate includes pre-import navigation, API key settings, and hidden Windows media subprocess consoles. It is staged under `release-artifacts/n8.1.3-24-g92611900bb-20261025-settings-nav-console-fix/`; the installer is 315,134,803 bytes with SHA-256 `01020caec318a57c4c30db1124e6db5ce863133091b257fed4f6226653d8d466`. The guarded build reran `npm ci`, 70 Rust tests, frontend compilation, and NSIS packaging; all seven staged file hashes match `SHA256SUMS.txt`. This is the candidate for local testing. It remains uncommitted and has the same distribution gates as the earlier candidate.
+
+The previous local test candidate adds Gemini annotation compatibility, more specific private transcript validation errors, DeepSeek discovery, and SQLite schema v6 migration. It is staged under `release-artifacts/n8.1.3-24-g92611900bb-20261025-gemini-deepseek/`; the installer is 315,148,977 bytes with SHA-256 `55a44f718f2f81c5ae38aa02d4e8f5dbf84d12dfa37372cbe06fef8659858e78`. The guarded build reran `npm ci`, 74 Rust tests, frontend compilation, and NSIS packaging; all seven staged hashes match `SHA256SUMS.txt`. Live Gemini and DeepSeek calls, clean VM acceptance, and distribution review remain open.
+
+The earlier local transcription recovery candidate measures the extracted WAV duration, tolerates small word-boundary rounding, and makes one bounded two-request recovery attempt when Gemini timestamps exceed the audio. It is staged under `release-artifacts/n8.1.3-24-g92611900bb-20261025-transcription-recovery/`; the installer is 315,138,186 bytes with SHA-256 `15f721c7a98b2e284379fd3f198bac55bdfbd42c058fef6801d841060f512470`. The guarded build reran `npm ci`, 81 Rust tests, frontend compilation, and NSIS packaging. A live Gemini call against the affected recording, clean VM acceptance, and distribution review remain open.
+
+The previous local test candidate repairs point timestamps and short reversed word intervals, retries a larger reversal with two shorter overlapping requests, and reports numeric offsets if that recovery fails. It is staged under `release-artifacts/n8.1.3-24-g92611900bb-20261025-word-timing-repair/`; the installer is 315,148,076 bytes with SHA-256 `9edb68564ba6bd560e37db35be3bc12376bafafaecee6fecbdfdd50bb2a7ea95`. The guarded build reran `npm ci`, 84 Rust tests, frontend compilation, and NSIS packaging; the installer hash matches `SHA256SUMS.txt`. Live acceptance on the affected recording, clean VM acceptance, and distribution review remain open.
+
+The earlier local test candidate adds optional ElevenLabs Scribe v2 transcription, per-chunk provider provenance, safe provider switching for pending chunks, timed phrase grouping, and a continuous searchable transcript. It is staged under `release-artifacts/n8.1.3-24-g92611900bb-20261025-scribe-longform/`; the installer is 315,208,636 bytes with SHA-256 `0e94a01ff51617a422efc9f952fd22856faa9d5c1470d9a0a5473afa45bfaacf`. The guarded build reran `npm ci`, 94 Rust tests, frontend compilation, and NSIS packaging; the installer hash matches `SHA256SUMS.txt`. Live ElevenLabs acceptance on the affected recording, clean VM acceptance, and distribution review remain open.
+
+The preceding local test candidate also adds one bounded two-request recovery for invalid ElevenLabs word timing. It is staged under `release-artifacts/n8.1.3-24-g92611900bb-20261025-scribe-recovery/`; the installer is 315,168,495 bytes with SHA-256 `5483d535461f323fd7a5c8be534c47f798b5609e0da4b679afe5718a574a16e4`. The guarded build reran `npm ci`, 94 Rust tests, frontend compilation, and NSIS packaging; the installer hash matches `SHA256SUMS.txt`. Live ElevenLabs acceptance on the affected recording, clean VM acceptance, and distribution review remain open.
+
+The preceding local test candidate improves DeepSeek JSON diagnostics, bounded retries for empty or invalid output, and exact quote validation across timed phrase boundaries. It is staged under `release-artifacts/n8.1.3-24-g92611900bb-20261025-deepseek-diagnostics/`; the installer is 315,237,770 bytes with SHA-256 `b24fbac29fc609c8123d536edd2d423a4e71667c47e6b6c44482511c4e2b5157`. The guarded build reran `npm ci`, 98 Rust tests, frontend compilation, and NSIS packaging; all seven staged file hashes match `SHA256SUMS.txt`. Live DeepSeek acceptance on the affected recording, clean VM acceptance, and distribution review remain open.
+
+The preceding local test candidate limits DeepSeek to five source-grounded proposals per window, adds a corrective retry, retains valid suggestions when peers fail validation, and continues past windows whose suggestions all lack verified source quotes. It is staged under `release-artifacts/n8.1.3-24-g92611900bb-20261025-deepseek-partial-recovery/`; the installer is 315,251,196 bytes with SHA-256 `296a85fa38ec940702e1222e40fade3210344cc7ea7989ed7476831e78fc84ed`. The guarded build reran `npm ci`, 103 Rust tests, frontend compilation, and NSIS packaging; all seven staged file hashes match `SHA256SUMS.txt`. Live DeepSeek acceptance on the affected recording, clean VM acceptance, and distribution review remain open.
+
+The latest local test candidate removes the Windows native titlebar and puts labeled minimize, maximize or restore, and close controls inside the application opposite the fixed sidebar. It is staged under `release-artifacts/n8.1.3-24-g92611900bb-20261025-integrated-window-controls/`; the installer is 315,282,279 bytes with SHA-256 `0392395a3c485c911d84bc5c5b63ff4f8812cc873d94fb831fbd4af35b112d7c`. The guarded build reran `npm ci`, 119 Rust tests, frontend compilation, and NSIS packaging; the installer hash matches `SHA256SUMS.txt`. Use this candidate for local testing. Manual verification of window dragging, resize, maximize, and close on Windows remains open, alongside the affected podcast workflow, clean VM testing, and distribution review.
+
+The preceding local test candidate makes the sidebar fixed within the desktop window, removes the redundant workspace bar, and lets the content pane scroll independently. It is staged under `release-artifacts/n8.1.3-24-g92611900bb-20261025-fixed-sidebar-layout/`; the installer is 315,286,073 bytes with SHA-256 `f9d712862bee88d7855e3ada25e7f5f7932af8c5f91827d2968368222ec3f60f`. The guarded build reran `npm ci`, 119 Rust tests, frontend compilation, and NSIS packaging; the installer hash matches `SHA256SUMS.txt`. Desktop visual acceptance, the affected podcast workflow, clean VM testing, and distribution review remain open.
+
+The preceding local test candidate fixes exported caption timing and preserves reviewed edits, and adds editable framing changes over a clip so wide shots can fit all participants. It is staged under `release-artifacts/n8.1.3-24-g92611900bb-20261025-export-framing-fix/`; the installer is 315,316,235 bytes with SHA-256 `8b0bcc8e6f5b08b4afbc33fb98ddd559bef9033bd0071ee474e95211eebf9b1b`. The guarded build reran `npm ci`, 119 Rust tests, frontend compilation, and NSIS packaging; the installer hash matches `SHA256SUMS.txt`. Acceptance with the affected podcast, clean VM testing, and distribution review remain open.
+
+The preceding local test candidate improves editorial selection, adds local or consent-gated Gemini framing suggestions per project, and lets the creator regenerate faithful captions from the corrected AI transcript. It is staged under `release-artifacts/n8.1.3-24-g92611900bb-20261025-editorial-framing-captions/`; the installer is 315,258,143 bytes with SHA-256 `6cc1b7497bcd5d108fc975e1306c0f08b1fdb0327f2b16ba7aa29c6e4794dc20`. The guarded build reran `npm ci`, 114 Rust tests, frontend compilation, and NSIS packaging; all seven staged file hashes match `SHA256SUMS.txt`. Live provider and framing quality on a real podcast, clean VM acceptance, and distribution review remain open.
+
+The preceding local test candidate changes discovery to complete 2â€“5 minute podcast arcs, keeps distinct overlapping cuts, supports five-minute local fallback previews, and groups legacy word-level captions for longer edits. It is staged under `release-artifacts/n8.1.3-24-g92611900bb-20261025-developed-clips-2to5min/`; the installer is 315,279,900 bytes with SHA-256 `c318cdd7187047b85e2832aa805a27721697669ca6807bd1e8479ee5d9b20480`. The guarded build reran `npm ci`, 106 Rust tests, frontend compilation, and NSIS packaging; all seven staged file hashes match `SHA256SUMS.txt`. Live discovery quality and five-minute export acceptance on the affected recording, clean VM acceptance, and distribution review remain open.
+
+The candidate's NSIS contents were inspected without installing it. It contains `ffmpeg.exe` (SHA-256 `4f99279baec49834ffafb911beebc88a5c011ff0fa8a1422041a9e94b6e169ca`), `ffprobe.exe` (SHA-256 `65dfdadc73282d94813521f91433f333872640fea653923904e9ef229b64f24f`), Cortelol's MIT license, FFmpeg GPL text, build configuration, manifest and notice, plus the offline WebView2 installer. Every file in the candidate's `SHA256SUMS.txt` was independently verified. This is an archive-content check, not an installed runtime or license-compliance acceptance.
+
+## 1. Freeze the release inputs
+
+- [ ] Complete the workflows promised by the release scope in [PLAN.md](PLAN.md). The current import screen alone does not meet the milestone 6 acceptance check.
+- [ ] Commit the source, `package-lock.json`, and `src-tauri/Cargo.lock`; build from a clean tagged commit with a recorded Node.js, npm, Rust toolchain, Windows SDK, and Tauri CLI version.
+- [x] Select x64 NSIS, current-user installation, and offline WebView2. Verify the actual minimum Windows version on a clean VM before advertising support.
+- [ ] Build the selected installer on a clean Windows build environment with the guarded script, which runs `npm ci`, `npm test`, and `tauri build`. Archive the build log, installer hash, toolchain versions, and release commit. Do not publish an artifact from a developer's uncommitted working tree.
+
+## 2. Bundle and account for FFmpeg
+
+- [x] Select and hash a fixed Windows FFmpeg build with both executables and `libx264`; record its version, release tag, build-script commit, URL, and build configuration.
+- [ ] Package the pinned executables as [Tauri sidecars](https://v2.tauri.app/develop/sidecar/) through the release overlay. Verify the Rust resolver and installed executable paths when `PATH` contains no FFmpeg or a conflicting version.
+- [ ] Archive the exact corresponding FFmpeg source and build configuration, including source or offers and notices required for any linked libraries in the chosen build. Include the applicable GPL text, FFmpeg copyright and attribution, build provenance, and a clear way for recipients to obtain the matching source. Review the selected build against the [FFmpeg legal guidance](https://ffmpeg.org/legal.html) and [FFmpeg's `libx264` documentation](https://ffmpeg.org/general.html). Record the review and do not label a GPL-enabled build as LGPL-only.
+- [ ] Place Cortelol's MIT license and the media toolchain's notices in the installer and release download materials. Generate and review a third-party dependency notice for bundled Rust crates, npm packages, fonts, and other redistributed assets. Preserve required license texts and attribution in the installed application or its accessible documentation.
+
+## 3. Review the packaged security boundary
+
+- [ ] Test the production [Content Security Policy](https://v2.tauri.app/security/csp/) with bundled assets, local media preview, and each implemented provider flow. Keep production sources limited to required origins and protocols; document any exception such as inline styles or media URLs.
+- [ ] Review `src-tauri/capabilities/default.json` against actual frontend calls. Grant only needed [Tauri permissions](https://v2.tauri.app/security/capabilities/) to the main window and verify custom Rust commands validate paths, timing, provider data, and publishing metadata at their boundary.
+- [ ] Check the built installer and runtime for credentials, source recordings, transcript content, and private URLs. Confirm credentials remain in OS credential storage and logs do not contain sensitive media or provider responses.
+
+## 4. Accept on a clean Windows machine
+
+- [ ] Install the produced artifact on a clean supported Windows VM without Node.js, Rust, FFmpeg, FFprobe, or developer environment variables. Include a VM without preinstalled WebView2 if the selected support matrix requires it.
+- [ ] Confirm install, launch, file picker interaction, audio and video import, persistence across restart, and actionable errors for missing or invalid media.
+- [ ] Run the completed core workflow with a user-owned fixture: transcript review, suggestion review, boundary and caption edits, preview, and local MP4/subtitle export. Verify the output against reviewed edits and that the source file and existing exports remain unchanged. Test interruption, retry, and recovery for long-running jobs.
+- [ ] If direct publishing is part of this release, verify an eligible test account through the official API, explicit review and publish action, processing status, and failure behavior that preserves the local export. Verify manual export remains usable when publishing is unavailable.
+- [ ] Test keyboard navigation, visible focus, labels, error announcements, screen reader reading order, 200% text scaling, and a 720 px wide window. Record the tested Windows/WebView2 versions, assistive technology, failures, and fixes.
+- [ ] Uninstall and reinstall the same build. Confirm uninstall behavior preserves user-owned source recordings and exports. Retain a signed-off acceptance log and hashes for the tested installer.
+
+## Unresolved release choices and artifacts
+
+The MIT license and continued use of `libx264` are decided. The following still require a concrete selection or produced artifact before a release can be declared:
+
+| Item | Required result |
+| --- | --- |
+| Windows support | NSIS/x64/offline WebView2 chosen; minimum tested OS version and code-signing decision remain |
+| FFmpeg distribution | Binary and source archives assembled and hash-pinned; final source and linked-license review remains |
+| Build provenance | Clean tagged commit, pinned toolchains, repeatable build instructions, archived logs, installer hashes, and published download location |
+| Dependency notices | Audited notice bundle for shipped Rust, npm, font, FFmpeg, and other binary dependencies |
+| Product readiness | The manual MP4/SRT publishing scope is documented in PRD.md; live Gemini/Claude/OpenAI and clean desktop workflow acceptance still remain |
+| Release evidence | Clean VM workflow and accessibility records, security review, and final installer verification |
