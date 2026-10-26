@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Cortelol">
+  <rect width="32" height="32" rx="9" fill="#FF7A45"/>
+  <g fill="none" stroke="#11151B" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" transform="translate(4 4)">
+    <circle cx="6" cy="6" r="2.7"/>
+    <circle cx="6" cy="18" r="2.7"/>
+    <path d="m8.1 8.1 7.8 7.8M8.1 15.9 20 4M15.9 8.1 20 20"/>
+  </g>
+</svg>

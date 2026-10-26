@@ -48,3 +48,6 @@ Enable a creator to import a 60-minute podcast, review AI suggestions, and expor
 
 # 08 Initial Open Source Release Scope Decision
 The initial Windows open source release uses reviewed local MP4 and SRT export as the publishing handoff. The creator uploads those files manually through the destination platform. Direct TikTok and Instagram posting remains a planned version 1 integration after a developer app has the required approval, OAuth connection, and platform capabilities; no approved app is available for the current release. The interface must not offer a live publish action without those prerequisites. The local export workflow and its review, caption, and source-preservation requirements remain in scope for release acceptance.
+
+# 09 Public Landing Page Scope Decision
+The project includes a static, multilingual public landing page hosted on GitHub Pages. It explains the local podcast-to-clip workflow with illustrative, synthetic interface scenes and links to the public source code. The page may link to GitHub Releases, but it must not offer an installer download or claim a production release until the Windows release checklist is complete and a reviewed installer is published. The site does not collect recordings, credentials, analytics, or contact information.

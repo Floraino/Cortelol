@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#11151B" />
+    <meta name="description" content="Cortelol é um aplicativo de código aberto para transformar seus podcasts em cortes verticais com transcrição, legendas e edição sob seu controle." />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Cortelol — Do episódio ao corte" />
+    <meta property="og:description" content="Encontre momentos, edite legendas e exporte cortes verticais no seu computador." />
+    <meta property="og:image" content="assets/logo.svg" />
+    <link rel="icon" href="assets/logo.svg" />
+    <link rel="stylesheet" href="styles.css" />
+    <title>Cortelol — Do episódio ao corte</title>
+  </head>
+  <body>
+    <a class="skip-link" href="#main" data-i18n="skip">Pular para o conteúdo</a>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="Cortelol, início" data-i18n-aria="brandLabel"><img src="assets/logo.svg" alt="" width="32" height="32" /><span>cortelol<span class="brand-dot">.</span></span></a>
+      <nav aria-label="Menu principal" data-i18n-aria="navLabel">
+        <a href="#como-funciona" data-i18n="navHow">Como funciona</a>
+        <a href="#principios" data-i18n="navWhy">Por que Cortelol</a>
+        <a href="#download" data-i18n="navDownload">Download</a>
+      </nav>
+      <div class="header-actions">
+        <label class="language-control"><span class="sr-only" data-i18n="languageLabel">Idioma</span><select id="language" aria-label="Idioma" data-i18n-aria="languageLabel"><option value="pt">PT</option><option value="en">EN</option><option value="es">ES</option><option value="fr">FR</option></select></label>
+        <a class="header-github" href="https://github.com/Floraino/Cortelol" target="_blank" rel="noopener noreferrer" aria-label="Cortelol no GitHub" data-i18n-aria="githubLabel">GitHub <span aria-hidden="true">↗</span></a>
+      </div>
+    </header>
+
+    <main id="main">
+      <section class="hero" id="top" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="edition-line"><span class="signal-dot"></span><span data-i18n="edition">Editor de podcasts · Código aberto</span></p>
+          <h1 id="hero-title" data-i18n="heroTitle">Um episódio inteiro.<br />Vários cortes que valem a conversa.</h1>
+          <p class="hero-description" data-i18n="heroBody">Encontre bons momentos no seu podcast, ajuste cada corte e exporte vídeos verticais com legendas. A decisão final é sempre sua.</p>
+          <div class="hero-actions"><a class="button button-primary" href="#como-funciona" data-i18n="seeHow">Veja como funciona <span aria-hidden="true">↓</span></a><a class="button button-secondary" href="#download" data-i18n="getApp">Obter Cortelol</a></div>
+          <p class="hero-note" data-i18n="heroNote">Para Windows · Fonte aberta · Seus arquivos permanecem locais</p>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <div class="art-grid"></div>
+          <div class="hero-source"><div class="source-top"><span class="source-record"></span><span>EPISODE_042.MP4</span><span>01:04:28</span></div><div class="source-people"><span class="person person-one"></span><span class="table-shape"></span><span class="person person-two"></span></div><div class="source-crop"></div><div class="source-wave"></div></div>
+          <div class="hero-output"><span class="output-top">Cortelol / 9:16</span><div class="output-person"></div><div class="output-caption"><span>"</span><span data-i18n="mockCaption">A ideia mudou tudo.</span><span>"</span></div><div class="output-progress"></div></div>
+          <div class="hero-connector"><span></span><span></span><span></span></div>
+          <div class="art-index">16:9 <span>→</span> 9:16</div>
+        </div>
+        <div class="hero-bottom"><span data-i18n="heroBottom">Da gravação ao vídeo pronto para revisão</span><span>01 / 05</span></div>
+      </section>
+
+      <section class="workflow" id="como-funciona" aria-labelledby="workflow-title">
+        <div class="section-intro"><p class="section-kicker" data-i18n="workflowKicker">O fluxo de trabalho</p><h2 id="workflow-title" data-i18n="workflowTitle">Acompanhe cada decisão do corte.</h2><p data-i18n="workflowBody">Role a página para percorrer um exemplo ilustrativo do fluxo do Cortelol, da mídia original ao arquivo exportado.</p></div>
+        <div class="workflow-layout">
+          <div class="step-list" id="step-list">
+            <article class="step is-active" data-step="0"><span class="step-index">01</span><div><h3 data-i18n="step1Title">Importe seu episódio</h3><p data-i18n="step1Body">Abra uma gravação de áudio ou vídeo. O arquivo original continua no seu computador.</p></div></article>
+            <article class="step" data-step="1"><span class="step-index">02</span><div><h3 data-i18n="step2Title">Leia e corrija a transcrição</h3><p data-i18n="step2Body">A transcrição com horários vira uma forma rápida de navegar pelo episódio. Você corrige o texto antes de criar as legendas.</p></div></article>
+            <article class="step" data-step="2"><span class="step-index">03</span><div><h3 data-i18n="step3Title">Encontre momentos</h3><p data-i18n="step3Body">A IA propõe trechos com contexto e começo, meio e fim. Confira cada sugestão na gravação antes de aceitar.</p></div></article>
+            <article class="step" data-step="3"><span class="step-index">04</span><div><h3 data-i18n="step4Title">Edite o enquadramento e as legendas</h3><p data-i18n="step4Body">Ajuste o intervalo, o texto e o quadro vertical ao longo do clipe — inclusive quando a cena abre para mostrar todos.</p></div></article>
+            <article class="step" data-step="4"><span class="step-index">05</span><div><h3 data-i18n="step5Title">Exporte para publicar</h3><p data-i18n="step5Body">Revise e renderize um MP4 com legendas, com SRT opcional. O upload para a plataforma é feito por você.</p></div></article>
+          </div>
+          <div class="demo-sticky"><div class="demo" aria-label="Demonstração ilustrativa do fluxo do aplicativo" data-i18n-aria="demoLabel"><div class="demo-titlebar"><div class="demo-mark"><img src="assets/logo.svg" alt="" width="20" height="20" />cortelol<span>.</span></div><div class="demo-window-buttons"><i></i><i></i><i></i></div></div><div class="demo-body"><div class="demo-sidebar"><span class="demo-side-brand">C.</span><span class="side-icon is-current">▣</span><span class="side-icon">≡</span><span class="side-icon">✦</span><span class="side-icon">✂</span><span class="side-icon">↥</span></div><div class="demo-workspace"><div class="demo-header"><span class="demo-breadcrumb" data-i18n="demoProject">Projeto / Conversa 042</span><span id="demo-stage-label" data-i18n="demoStage1">Importar mídia</span></div><div class="demo-scenes"><div class="scene scene-import is-visible" data-scene="0"><div class="import-file"><div class="file-icon">▶</div><div><strong>conversa_042.mp4</strong><span>01:04:28 · 1920 × 1080 · MP4</span></div><span class="file-ok">✓</span></div><div class="import-track"><div class="import-thumb"><span class="mini-person"></span><span class="mini-person"></span></div><div class="waveform"></div></div><div class="scene-footer"><span data-i18n="demoLocal">Arquivo original preservado</span><span class="check-mark">✓</span></div></div><div class="scene scene-transcript" data-scene="1"><div class="transcript-head"><span data-i18n="demoTranscript">Transcrição</span><span>01:04:28</span></div><div class="transcript-row"><time>12:14</time><p data-i18n="line1">Quando começamos, ninguém acreditava que funcionaria.</p></div><div class="transcript-row active"><time>12:22</time><p data-i18n="line2">Mas foi exatamente aí que a ideia mudou tudo.</p></div><div class="transcript-row"><time>12:29</time><p data-i18n="line3">A primeira conversa já mostrou outro caminho.</p></div><div class="text-cursor"></div></div><div class="scene scene-discover" data-scene="2"><div class="suggestion"><div class="suggestion-rating">✦ <span data-i18n="suggestion">Momento sugerido</span></div><strong data-i18n="suggestionTitle">A decisão que mudou o projeto</strong><p data-i18n="suggestionQuote">"Foi exatamente aí que a ideia mudou tudo."</p><div class="suggestion-bottom"><span>12:14 — 15:06 · 02:52</span><span data-i18n="review">Revisar trecho ↗</span></div></div><div class="suggestion small-suggestion"><span data-i18n="suggestion2">Uma segunda perspectiva</span><span>28:10 — 30:41</span></div></div><div class="scene scene-edit" data-scene="3"><div class="edit-canvas"><div class="edit-person left"></div><div class="edit-person right"></div><div class="edit-safe"></div><div class="edit-caption" data-i18n="mockCaption">A ideia mudou tudo.</div></div><div class="edit-controls"><div class="edit-toggle"><span>9:16</span><span data-i18n="fitAll">Mostrar todos</span></div><div class="edit-timeline"><span class="playhead"></span><i></i><i></i><i></i></div><span class="edit-time">00:42 / 02:52</span></div></div><div class="scene scene-export" data-scene="4"><div class="export-preview"><div class="export-person"></div><div class="export-caption" data-i18n="mockCaption">A ideia mudou tudo.</div></div><div class="export-details"><span data-i18n="exportReady">Pronto para revisão</span><strong>corte_01.mp4</strong><span>1080 × 1920 · MP4</span><div class="export-meter"><span></span></div><span class="export-complete" data-i18n="exportLocal">Exportado no computador ✓</span></div></div></div><div class="demo-bottom"><span><span class="demo-live-dot"></span><span data-i18n="illustrative">Demonstração ilustrativa</span></span><span id="demo-count">01 / 05</span></div></div></div><div class="demo-progress"><span id="demo-progress-fill"></span></div></div></div>
+        </div>
+      </section>
+
+      <section class="principles" id="principios" aria-labelledby="principles-title"><div class="principles-heading"><p class="section-kicker" data-i18n="principlesKicker">Feito para quem cria</p><h2 id="principles-title" data-i18n="principlesTitle">O seu olhar continua na edição.</h2></div><div class="principle-grid"><article><span class="principle-glyph">⌁</span><h3 data-i18n="p1Title">Sugestão, não decisão</h3><p data-i18n="p1Body">As sugestões de IA são um ponto de partida. Você confere o trecho, ajusta o corte e aprova o resultado.</p></article><article><span class="principle-glyph">▥</span><h3 data-i18n="p2Title">O quadro acompanha a cena</h3><p data-i18n="p2Body">O enquadramento 9:16 pode mudar dentro do mesmo clipe ou abrir para preservar uma conversa em grupo.</p></article><article><span class="principle-glyph">◎</span><h3 data-i18n="p3Title">Seu projeto fica com você</h3><p data-i18n="p3Body">Gravações, edição e exportações ficam no seu computador. Você escolhe quando enviar dados a um provedor de IA.</p></article></div></section>
+
+      <section class="download" id="download" aria-labelledby="download-title"><div class="download-orbit" aria-hidden="true"><span>C.</span></div><div class="download-copy"><p class="section-kicker" data-i18n="downloadKicker">Comece pelo código</p><h2 id="download-title" data-i18n="downloadTitle">Cortelol é aberto para explorar.</h2><p data-i18n="downloadBody">O código-fonte está disponível no GitHub. O instalador público para Windows ainda está em preparação e aparecerá na página de versões quando estiver pronto.</p><div class="download-actions"><a class="button button-primary" href="https://github.com/Floraino/Cortelol/archive/refs/heads/main.zip" data-i18n="sourceZip">Baixar código-fonte ZIP</a><a class="button button-secondary" href="https://github.com/Floraino/Cortelol/releases" data-i18n="releases">Ver versões no GitHub</a></div><p class="download-status"><span class="status-ring"></span><span data-i18n="installerStatus">Instalador Windows: em preparação</span></p></div></section>
+    </main>
+    <footer class="site-footer"><a class="brand" href="#top"><img src="assets/logo.svg" alt="" width="28" height="28" /><span>cortelol<span class="brand-dot">.</span></span></a><p data-i18n="footer">Código aberto para transformar conversas em vídeos que merecem ser vistos.</p><a href="https://github.com/Floraino/Cortelol" target="_blank" rel="noopener noreferrer">GitHub ↗</a></footer>
+    <script src="script.js" defer></script>
+  </body>
+</html>

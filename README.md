@@ -2,6 +2,8 @@
 
 Cortelol is an open source Windows desktop app that helps podcast creators turn their own long recordings into short, reviewed videos. It brings transcription, moment discovery, clip editing, captions, vertical framing, and local export into one workspace. The source recording stays on the creator's computer and is never overwritten.
 
+Explore the [multilingual landing page](https://floraino.github.io/Cortelol/) for an illustrated walkthrough. The public installer download remains unavailable until the Windows release checks are complete; the source code can be downloaded from this repository now.
+
 ## What it does
 
 1. **Import a recording:** Open a local audio or video file and keep working on the same project after restarting the app.

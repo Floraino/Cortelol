@@ -59,3 +59,8 @@ Use Lucide React. Line icons only, 1.5px stroke. Every icon-only control needs a
 - Provide visible focus, sensible tab order, labels, and alternatives to drag-only interactions.
 - Keep playback, editing, and export controls stable while background AI jobs run.
 - Display provider cost or usage estimates as estimates, and keep publish and delete actions explicit.
+
+# Public Website
+The landing page extends the Cortelol palette and Inter typography outside the desktop application. Use Background `#11151B` as the main canvas, Primary `#E9EEF5` for copy, Accent `#FF7A45` for the main action and timeline, Secondary `#7AA7FF` for supporting links, and Muted `#9AA5B3` for explanatory details. Dark panels may use translucent Primary overlays as in the application. The marketing page can use a larger display type scale than the desktop UI while keeping body text readable and restrained.
+
+The main visual pattern is a scroll-controlled sequence through the actual workflow: import, transcription, moment review, clip editing, and export. Its media and interface content are synthetic illustrations, not a recording of an actual user's project. The sequence should remain understandable by keyboard, on compact screens, and with reduced motion enabled. Language choice must be explicit and the selected language must apply to all public copy and controls. The installer call to action must reflect the actual release state.
