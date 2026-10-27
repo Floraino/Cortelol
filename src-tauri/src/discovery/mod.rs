@@ -19,6 +19,7 @@ const MAX_TEXT_BYTES: usize = 2_000;
 const MAX_RESPONSE_BYTES: usize = 256 * 1024;
 const TIME_TOLERANCE_SECONDS: f64 = 0.001;
 const QUOTE_BOUNDARY_TOLERANCE_SECONDS: f64 = 1.0;
+const MAX_QUOTE_SEGMENT_GAP_SECONDS: f64 = 1.0;
 pub(super) const MIN_GENERATED_CLIP_SECONDS: f64 = 120.0;
 pub(super) const MAX_GENERATED_CLIP_SECONDS: f64 = 300.0;
 
@@ -394,9 +395,10 @@ fn quote_is_in_range(quote: &str, transcript: &[TranscriptSegment], range: TimeR
     // Phrase segments do not carry individual word timestamps. Estimate each
     // word's position within its phrase so a cut through a phrase can still
     // match its quote without allowing a barely touching cut to claim it.
-    let source_words: Vec<(String, TimeRange)> = transcript
+    let source_words: Vec<(String, TimeRange, usize)> = transcript
         .iter()
-        .flat_map(|segment| {
+        .enumerate()
+        .flat_map(|(segment_index, segment)| {
             let segment_words = words(&segment.text);
             let count = segment_words.len();
             segment_words
@@ -410,12 +412,31 @@ fn quote_is_in_range(quote: &str, transcript: &[TranscriptSegment], range: TimeR
                             start_seconds: segment.start_seconds + index as f64 * width,
                             end_seconds: segment.start_seconds + (index + 1) as f64 * width,
                         },
+                        segment_index,
                     )
                 })
         })
         .collect();
     source_words.windows(quote_words.len()).any(|window| {
-        if !window.iter().map(|(word, _)| word).eq(quote_words.iter()) {
+        if !window
+            .iter()
+            .map(|(word, _, _)| word)
+            .eq(quote_words.iter())
+        {
+            return false;
+        }
+        if window.windows(2).any(|pair| {
+            let previous = pair[0].2;
+            let next = pair[1].2;
+            previous != next
+                && (next != previous + 1
+                    || transcript[next].start_seconds - transcript[previous].end_seconds
+                        > MAX_QUOTE_SEGMENT_GAP_SECONDS
+                    || matches!(
+                        (&transcript[previous].speaker, &transcript[next].speaker),
+                        (Some(left), Some(right)) if left != right
+                    ))
+        }) {
             return false;
         }
         let quote_start = window.first().unwrap().1.start_seconds;
@@ -511,6 +532,33 @@ mod tests {
         .unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].score, Some(0.8));
+    }
+
+    #[test]
+    fn rejects_quote_spliced_across_a_pause_or_speaker_change() {
+        let mut segments = transcript();
+        segments[1].start_seconds = 18.0;
+        segments[1].end_seconds = 20.0;
+        let window = TimeRange {
+            start_seconds: 10.0,
+            end_seconds: 22.0,
+        };
+        assert_eq!(
+            parse_quote_suggestions(&json(10.0, 20.0, "ideia mudou"), &segments, 60.0, window),
+            Err(DiscoveryError::InvalidSuggestion(
+                0,
+                "sourceQuote words do not occur in the analyzed transcript in order"
+            ))
+        );
+        let mut segments = transcript();
+        segments[1].speaker = Some("B".into());
+        assert_eq!(
+            parse_quote_suggestions(&json(10.0, 14.0, "ideia mudou"), &segments, 60.0, window),
+            Err(DiscoveryError::InvalidSuggestion(
+                0,
+                "sourceQuote words do not occur in the analyzed transcript in order"
+            ))
+        );
     }
 
     #[test]

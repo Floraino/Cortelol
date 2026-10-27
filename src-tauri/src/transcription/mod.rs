@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 pub enum TranscriptionProvider {
     Gemini,
     Elevenlabs,
+    Local,
 }
 
 impl TranscriptionProvider {
@@ -22,6 +23,7 @@ impl TranscriptionProvider {
         match self {
             Self::Gemini => "gemini",
             Self::Elevenlabs => "elevenlabs",
+            Self::Local => "local",
         }
     }
 
@@ -29,6 +31,7 @@ impl TranscriptionProvider {
         match value {
             "gemini" => Some(Self::Gemini),
             "elevenlabs" => Some(Self::Elevenlabs),
+            "local" => Some(Self::Local),
             _ => None,
         }
     }

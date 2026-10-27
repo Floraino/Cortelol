@@ -20,6 +20,7 @@ use super::{
 const MAX_WINDOW_SECONDS: f64 = 15.0 * 60.0;
 const MAX_WINDOW_TEXT_BYTES: usize = 180 * 1024;
 const MAX_WINDOW_SEGMENTS: usize = 3_000;
+const WINDOW_OVERLAP_SECONDS: f64 = 300.0;
 
 #[derive(Default)]
 pub struct DiscoveryRuntime {
@@ -87,8 +88,8 @@ fn corrected_segments(stored: &[StoredTranscriptSegment]) -> Vec<TranscriptSegme
 
 fn transcript_revision(segments: &[StoredTranscriptSegment]) -> String {
     let mut digest = Sha256::new();
-    // Changing the discovery contract invalidates previously completed short cuts.
-    digest.update(b"discovery-editorial-v2");
+    // Changing window planning or source validation invalidates old discovery jobs.
+    digest.update(b"discovery-editorial-v3");
     for segment in segments {
         digest.update(segment.id.to_le_bytes());
         digest.update(segment.start_seconds.to_bits().to_le_bytes());
@@ -105,11 +106,6 @@ fn plan_windows(segments: &[TranscriptSegment], duration: f64) -> Result<Vec<Win
     if segments.is_empty() || !duration.is_finite() || duration <= 0.0 {
         return Err("Complete a usable transcript before finding moments.".to_string());
     }
-    let mut windows = Vec::new();
-    let mut first: Option<f64> = None;
-    let mut end: f64 = 0.0;
-    let mut bytes = 0usize;
-    let mut count = 0usize;
     let mut previous_start = 0.0;
     for segment in segments {
         if !segment.start_seconds.is_finite()
@@ -127,38 +123,54 @@ fn plan_windows(segments: &[TranscriptSegment], duration: f64) -> Result<Vec<Win
             );
         }
         previous_start = segment.start_seconds;
-        let start = first.unwrap_or(segment.start_seconds);
-        let next_end = end.max(segment.end_seconds);
-        let next_bytes = bytes.saturating_add(segment.text.len() + 100);
-        if first.is_some()
-            && (next_end - start > MAX_WINDOW_SECONDS
-                || next_bytes > MAX_WINDOW_TEXT_BYTES
-                || count >= MAX_WINDOW_SEGMENTS)
-        {
-            windows.push(Window {
-                range: TimeRange {
-                    start_seconds: start,
-                    end_seconds: end,
-                },
-            });
-            first = Some(segment.start_seconds);
-            end = segment.end_seconds;
-            bytes = segment.text.len() + 100;
-            count = 1;
-        } else {
-            first = Some(start);
+    }
+    let mut windows = Vec::new();
+    let mut start_index = 0;
+    while start_index < segments.len() {
+        let start = segments[start_index].start_seconds;
+        let mut end = start;
+        let mut end_index = start_index;
+        let mut bytes = 0usize;
+        while let Some(segment) = segments.get(end_index) {
+            let next_end = end.max(segment.end_seconds);
+            let next_bytes = bytes.saturating_add(segment.text.len() + 100);
+            if end_index > start_index
+                && (next_end - start > MAX_WINDOW_SECONDS
+                    || next_bytes > MAX_WINDOW_TEXT_BYTES
+                    || end_index - start_index >= MAX_WINDOW_SEGMENTS)
+            {
+                break;
+            }
             end = next_end;
             bytes = next_bytes;
-            count += 1;
+            end_index += 1;
         }
-    }
-    if let Some(start) = first {
         windows.push(Window {
             range: TimeRange {
                 start_seconds: start,
                 end_seconds: end,
             },
         });
+        if end_index == segments.len() {
+            break;
+        }
+        let overlap_start = end - WINDOW_OVERLAP_SECONDS;
+        let mut next_start = end_index;
+        let mut overlap_bytes = 0usize;
+        while next_start > start_index + 1 {
+            let candidate = next_start - 1;
+            let candidate_bytes =
+                overlap_bytes.saturating_add(segments[candidate].text.len() + 100);
+            if segments[candidate].end_seconds <= overlap_start
+                || candidate_bytes > MAX_WINDOW_TEXT_BYTES / 3
+                || end_index - candidate > MAX_WINDOW_SEGMENTS / 3
+            {
+                break;
+            }
+            next_start = candidate;
+            overlap_bytes = candidate_bytes;
+        }
+        start_index = next_start;
     }
     Ok(windows)
 }
@@ -526,7 +538,7 @@ mod tests {
             .map(|i| segment(i as f64 * 30.0, (i + 1) as f64 * 30.0, "spoken words"))
             .collect();
         let windows = plan_windows(&segments, 3600.0).unwrap();
-        assert_eq!(windows.len(), 4);
+        assert!(windows.len() >= 4);
         assert!(
             windows
                 .iter()
@@ -534,6 +546,21 @@ mod tests {
         );
         assert_eq!(windows.first().unwrap().range.start_seconds, 0.0);
         assert_eq!(windows.last().unwrap().range.end_seconds, 3600.0);
+        assert!(windows.iter().any(|window| {
+            window.range.start_seconds <= 850.0 && window.range.end_seconds >= 1050.0
+        }));
+    }
+
+    #[test]
+    fn dense_transcript_overlap_stays_bounded() {
+        let segments: Vec<_> = (0..6_000)
+            .map(|i| segment(i as f64 / 10.0, i as f64 / 10.0 + 0.05, "spoken words"))
+            .collect();
+        let windows = plan_windows(&segments, 600.0).unwrap();
+        assert!(windows.len() <= 10);
+        assert!(windows.iter().all(|window| {
+            window.range.end_seconds - window.range.start_seconds <= MAX_WINDOW_SECONDS
+        }));
     }
 
     #[test]
@@ -545,6 +572,7 @@ mod tests {
             text: "one".into(),
             speaker: None,
             corrected: false,
+            provider: None,
         };
         let mut changed = first.clone();
         changed.text = "two".into();

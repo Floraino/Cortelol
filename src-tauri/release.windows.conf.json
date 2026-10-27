@@ -4,14 +4,21 @@
     "targets": "nsis",
     "externalBin": [
       "binaries/ffmpeg",
-      "binaries/ffprobe"
+      "binaries/ffprobe",
+      "binaries/yt-dlp",
+      "binaries/deno"
     ],
     "resources": {
       "../LICENSE": "legal/Cortelol-MIT.txt",
       "../legal/FFMPEG-WINDOWS.md": "legal/FFMPEG-WINDOWS.md",
       "../legal/ffmpeg-win64.json": "legal/ffmpeg-win64.json",
       "../legal/FFMPEG-BUILDCONF.txt": "legal/FFMPEG-BUILDCONF.txt",
-      "release-legal/FFMPEG-GPL.txt": "legal/FFMPEG-GPL.txt"
+      "release-legal/FFMPEG-GPL.txt": "legal/FFMPEG-GPL.txt",
+      "../legal/DOWNLOADER-WINDOWS.md": "legal/DOWNLOADER-WINDOWS.md",
+      "../legal/downloader-win64.json": "legal/downloader-win64.json",
+      "../legal/YT-DLP-LICENSE.txt": "legal/YT-DLP-LICENSE.txt",
+      "../legal/YT-DLP-THIRD-PARTY-LICENSES.txt": "legal/YT-DLP-THIRD-PARTY-LICENSES.txt",
+      "../legal/DENO-LICENSE.md": "legal/DENO-LICENSE.md"
     },
     "windows": {
       "webviewInstallMode": {

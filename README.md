@@ -18,6 +18,12 @@ AI suggestions never publish on their own. Provider keys are stored in the opera
 
 This is an early Windows development project, not a finished public release. Import, transcription, discovery, editing, and export are implemented, but full desktop acceptance and live provider checks are still in progress. The Windows installer is a local test candidate and is not published here. Direct TikTok and Instagram publishing requires approved developer apps and is not available in this release; reviewed local export is the publishing handoff. See [PLAN.md](PLAN.md) and [RELEASE.md](RELEASE.md) for open work and release requirements.
 
+## Local transcription and video acquisition
+
+The desktop Transcribe workspace offers an optional **Local transcription** section. Select an installed Python executable with `faster-whisper` and an existing multilingual CTranslate2 model directory. The app extracts audio with its FFmpeg toolchain, runs the bundled transcription script locally, saves resumable chunks and quality receipts, and shows phrases in the same correction workspace as hosted transcription. Python, `faster-whisper`, and model weights are not bundled or downloaded by the installer. The [local transcription guide](scripts/LOCAL_ASR.md) also documents the standalone `scripts/Transcribe-Video.py` command, which writes JSON, SRT, and a quality report. Accuracy varies; review text, timing, and captions against the source.
+
+The desktop Import workspace accepts a single public YouTube video URL for a bounded local download using packaged yt-dlp and Deno executables. It also offers [YouTube Studio or Google Takeout](https://support.google.com/youtube/answer/56100) and local-file import. The download is a local test candidate: it does not support every public video, login, DRM, live streams, playlists, age or region restrictions, and it has not passed the planned Windows process and network isolation review. Do not treat the installer as a public release. Vimeo acquisition is no longer offered; previously saved media and receipts remain usable. The standalone `scripts/download_video.py` prototype is not used by the desktop app.
+
 ## Develop locally
 
 You need Windows, the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/), Node.js with npm, Rust, and FFmpeg plus FFprobe on `PATH`. The FFmpeg build must include `libx264` and `libass` for captioned MP4 export.

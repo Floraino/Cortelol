@@ -1,23 +1,25 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "../../i18n";
 import { invoke } from "@tauri-apps/api/core";
 import { Check, KeyRound, ShieldCheck, Trash2 } from "lucide-react";
 import "./SettingsWorkspace.css";
 
 type Provider = "gemini" | "elevenlabs" | "claude" | "openai" | "deepseek";
 
-const providers: { id: Provider; name: string; purpose: string }[] = [
-  { id: "gemini", name: "Gemini", purpose: "Transcribe recordings" },
-  { id: "elevenlabs", name: "ElevenLabs", purpose: "Transcribe recordings with Scribe v2" },
-  { id: "claude", name: "Claude", purpose: "Find moments in the transcript" },
-  { id: "openai", name: "OpenAI", purpose: "Find moments in the transcript" },
-  { id: "deepseek", name: "DeepSeek", purpose: "Find moments in the transcript" },
+const providers: { id: Provider; name: string }[] = [
+  { id: "gemini", name: "Gemini" },
+  { id: "elevenlabs", name: "ElevenLabs" },
+  { id: "claude", name: "Claude" },
+  { id: "openai", name: "OpenAI" },
+  { id: "deepseek", name: "DeepSeek" },
 ];
 
 function message(cause: unknown, fallback: string): string {
   return typeof cause === "string" ? cause : cause instanceof Error ? cause.message : fallback;
 }
 
-function ProviderKey({ id, name, purpose }: { id: Provider; name: string; purpose: string }) {
+function ProviderKey({ id, name }: { id: Provider; name: string }) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(true);
   const [available, setAvailable] = useState(false);
   const [key, setKey] = useState("");
@@ -30,7 +32,7 @@ function ProviderKey({ id, name, purpose }: { id: Provider; name: string; purpos
     let active = true;
     invoke<boolean>("has_api_key", { provider: id })
       .then((stored) => { if (active) setAvailable(stored); })
-      .catch((cause) => { if (active) setError(message(cause, `Could not check the ${name} key.`)); })
+      .catch((cause) => { if (active) setError(message(cause, t("settings.checkKeyError", { provider: name }))); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [id, name]);
@@ -46,9 +48,9 @@ function ProviderKey({ id, name, purpose }: { id: Provider; name: string; purpos
       await invoke("save_api_key", { provider: id, key: key.trim() });
       setKey("");
       setAvailable(true);
-      setNotice(`${name} key ${available ? "replaced" : "saved"}.`);
+      setNotice(t(available ? "settings.keyReplaced" : "settings.keySavedNotice", { provider: name }));
     } catch (cause) {
-      setError(message(cause, `Could not save the ${name} key.`));
+      setError(message(cause, t("settings.saveKeyError", { provider: name })));
     } finally {
       setBusy(false);
     }
@@ -64,9 +66,9 @@ function ProviderKey({ id, name, purpose }: { id: Provider; name: string; purpos
       setAvailable(false);
       setConfirmDelete(false);
       setKey("");
-      setNotice(`${name} key removed from the credential store.`);
+      setNotice(t("settings.keyRemoved", { provider: name }));
     } catch (cause) {
-      setError(message(cause, `Could not remove the ${name} key.`));
+      setError(message(cause, t("settings.removeKeyError", { provider: name })));
     } finally {
       setBusy(false);
     }
@@ -76,15 +78,15 @@ function ProviderKey({ id, name, purpose }: { id: Provider; name: string; purpos
     <div className="settings-provider-heading">
       <div>
         <h3 id={`settings-${id}-title`}>{name}</h3>
-        <p>{purpose}</p>
+        <p>{t(`settings.purpose.${id}`)}</p>
       </div>
       <span className={available ? "settings-key-status saved" : "settings-key-status"}>
-        {available ? <><Check size={14} aria-hidden="true" /> Key saved</> : loading ? "Checking…" : "No key saved"}
+        {available ? <><Check size={14} aria-hidden="true" /> {t("settings.key.saved")}</> : loading ?t("settings.checking") :t("settings.no.key.saved")}
       </span>
     </div>
 
     <form className="settings-key-form" onSubmit={save}>
-      <label htmlFor={`settings-${id}-key`}>{available ? `Replace ${name} API key` : `${name} API key`}</label>
+      <label htmlFor={`settings-${id}-key`}>{t(available ? "settings.replaceProviderKey" : "settings.providerKey", { provider: name })}</label>
       <div className="settings-key-controls">
         <input
           id={`settings-${id}-key`}
@@ -93,22 +95,22 @@ function ProviderKey({ id, name, purpose }: { id: Provider; name: string; purpos
           spellCheck={false}
           value={key}
           onChange={(event) => { setKey(event.target.value); setNotice(null); }}
-          placeholder={available ? "Enter a new key" : "Paste your API key"}
+          placeholder={available ?t("settings.enter.a.new.key") :t("settings.paste.your.api.key")}
           disabled={busy || loading}
         />
         <button type="submit" className="primary-button" disabled={busy || loading || !key.trim()}>
-          {busy ? "Saving…" : available ? "Replace key" : "Save key"}
+          {busy ?t("settings.saving") : available ?t("settings.replace.key") :t("settings.save.key")}
         </button>
       </div>
     </form>
 
     {available && <div className="settings-remove">
       {confirmDelete ? <div className="settings-remove-confirm">
-        <span>Remove the {name} key from this device?</span>
-        <button type="button" className="settings-delete-button" onClick={remove} disabled={busy}>Yes, remove key</button>
-        <button type="button" className="replace-button" onClick={() => setConfirmDelete(false)} disabled={busy}>Keep key</button>
+        <span>{t("settings.removeProviderKey", { provider: name })}</span>
+        <button type="button" className="settings-delete-button" onClick={remove} disabled={busy}>{t("settings.yes.remove.key")}</button>
+        <button type="button" className="replace-button" onClick={() => setConfirmDelete(false)} disabled={busy}>{t("settings.keep.key")}</button>
       </div> : <button type="button" className="settings-remove-trigger" onClick={() => { setConfirmDelete(true); setError(null); setNotice(null); }} disabled={busy}>
-        <Trash2 size={14} aria-hidden="true" /> Remove saved key
+        <Trash2 size={14} aria-hidden="true" /> {t("settings.remove.saved.key")}
       </button>}
     </div>}
     {error && <p className="settings-message error" role="alert">{error}</p>}
@@ -117,17 +119,18 @@ function ProviderKey({ id, name, purpose }: { id: Provider; name: string; purpos
 }
 
 export function SettingsWorkspace() {
+  const { t } = useTranslation();
   return <section className="settings-workspace" aria-labelledby="settings-title">
     <div className="settings-header">
       <div className="settings-header-icon"><KeyRound size={22} aria-hidden="true" /></div>
       <div>
-        <span className="settings-eyebrow">PREFERENCES</span>
-        <h1 id="settings-title">Settings</h1>
-        <p>Manage the AI keys used by this device. Add them before importing a recording, or update them at any time.</p>
+        <span className="settings-eyebrow">{t("settings.preferences")}</span>
+        <h1 id="settings-title">{t("settings.settings")}</h1>
+        <p>{t("settings.manage.the.ai.keys.used")}</p>
       </div>
     </div>
 
-    <div className="settings-section-heading"><h2>AI providers</h2><span>Bring your own keys</span></div>
+    <div className="settings-section-heading"><h2>{t("settings.ai.providers")}</h2><span>{t("settings.bring.your.own.keys")}</span></div>
     <div className="settings-provider-list">
       {providers.map((provider) => <ProviderKey key={provider.id} {...provider} />)}
     </div>
@@ -135,8 +138,8 @@ export function SettingsWorkspace() {
     <aside className="settings-privacy">
       <ShieldCheck size={20} aria-hidden="true" />
       <div>
-        <h2>Privacy and storage</h2>
-        <p>Keys are stored in the operating system credential store. They are never shown again in the app. Recordings and exports stay on your device; AI processing sends only the data described at each job's consent step. Publishing is a manual upload from your exported file.</p>
+        <h2>{t("settings.privacy.and.storage")}</h2>
+        <p>{t("settings.keys.are.stored.in.the")}</p>
       </div>
     </aside>
   </section>;

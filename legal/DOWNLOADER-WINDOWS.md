@@ -1,0 +1,14 @@
+# Windows downloader binary notice and distribution gate
+
+This notice applies only to the pinned Windows x64 downloader sidecars in `downloader-win64.json`. The installer carries the executable and the exact notice files listed below as installed resources. Cortelol itself remains MIT licensed; this does not relabel third-party executables.
+
+| Component | Version and origin | License material shipped in installer |
+| --- | --- | --- |
+| `yt-dlp.exe` | Official PyInstaller Windows release `2026.10.26`, commit `f264a6cbd1f630894da0f368df00f8aae50140e0` | `YT-DLP-LICENSE.txt` and `YT-DLP-THIRD-PARTY-LICENSES.txt` |
+| `deno.exe` | Official Windows x64 archive `v2.9.8` | `DENO-LICENSE.md` |
+
+The [yt-dlp release](https://github.com/yt-dlp/yt-dlp/releases/tag/2026.10.26) states that the PyInstaller executables include additional licensed components; the [yt-dlp license section](https://github.com/yt-dlp/yt-dlp#licensing) identifies the combined executable as GPLv3-or-later. Its [EJS guidance](https://github.com/yt-dlp/yt-dlp/wiki/ejs) confirms that the official PyInstaller EXE already contains `yt-dlp-ejs`; the pinned [pyproject.toml](https://github.com/yt-dlp/yt-dlp/blob/f264a6cbd1f630894da0f368df00f8aae50140e0/pyproject.toml) specifies EJS `0.8.0`. Do not fetch EJS scripts or npm/GitHub components at runtime. The pinned Deno executable is distributed under its [MIT license](https://github.com/denoland/deno/blob/v2.9.8/LICENSE.md). Neither binary's license changes Cortelol's MIT source license.
+
+**Publication gate:** before distributing an installer, a release reviewer must assemble, retain, and make available the complete corresponding source for the exact GPL-covered yt-dlp executable and its bundled GPL components, including build scripts and patches, or establish and publish a valid source offer with a documented fulfillment process. Match the released binary and bundled dependency versions against `YT-DLP-THIRD-PARTY-LICENSES.txt`; record the reviewed archive hash, download location or offer, and sign-off in the release record. Merely linking to the yt-dlp repository is insufficient. Also audit the Deno binary's transitive third-party notices and the application's remaining bundled dependency notices. The build guard verifies binary and notice hashes but cannot certify source completeness or license compliance. Do not publish solely because `-CheckOnly` or an NSIS build passes.
+
+Installed paths: Tauri's `externalBin` entries `binaries/yt-dlp` and `binaries/deno` install `yt-dlp.exe` and `deno.exe` next to `cortelol.exe`. The release guard's `-StageOnly` mode verifies the inputs and leaves `src-tauri/binaries/yt-dlp-x86_64-pc-windows-msvc.exe` and `src-tauri/binaries/deno-x86_64-pc-windows-msvc.exe` staged without running npm or Tauri. A later full build reuses staged sidecars only when their pinned hashes match; it never overwrites a mismatched file.

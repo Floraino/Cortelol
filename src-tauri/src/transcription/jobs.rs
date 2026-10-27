@@ -24,7 +24,7 @@ const MIN_SPLIT_MS: u64 = 10_000;
 
 #[derive(Default)]
 pub struct TranscriptionRuntime {
-    running: Mutex<Option<CancellationToken>>,
+    pub(crate) running: Mutex<Option<CancellationToken>>,
 }
 
 fn empty_job() -> TranscriptionJob {
@@ -122,6 +122,9 @@ pub async fn transcribe_recent(
     consent: bool,
     provider: TranscriptionProvider,
 ) -> Result<(), String> {
+    if provider == TranscriptionProvider::Local {
+        return Err("Use the local transcription setup for the local provider.".to_string());
+    }
     if !consent {
         return Err("Review the audio sharing notice and agree before transcription.".to_string());
     }
@@ -191,6 +194,9 @@ async fn run_pending_chunks(
     let (key_provider, name) = match job.provider {
         TranscriptionProvider::Gemini => (Provider::Gemini, "Gemini"),
         TranscriptionProvider::Elevenlabs => (Provider::Elevenlabs, "ElevenLabs"),
+        TranscriptionProvider::Local => {
+            return Err("Use the local transcription setup for the local provider.".to_string());
+        }
     };
     let key = credentials::get_api_key(key_provider)?
         .ok_or_else(|| format!("Save a {name} API key before transcription."))?;
@@ -200,6 +206,9 @@ async fn run_pending_chunks(
         }
         TranscriptionProvider::Elevenlabs => {
             TranscriptionClient::Elevenlabs(ElevenLabsClient::new().map_err(elevenlabs_message)?)
+        }
+        TranscriptionProvider::Local => {
+            return Err("Use the local transcription setup for the local provider.".to_string());
         }
     };
     let cache = app
@@ -290,8 +299,9 @@ async fn transcribe_chunk_with_recovery_elevenlabs(
     match transcribe_one_chunk_elevenlabs(app, source_path, cache, chunk, client, key, token).await
     {
         Ok(words) => Ok(words),
-        Err(ChunkFailure::Elevenlabs(ElevenLabsError::InvalidTranscript)) => {
-            let (left, right) = split_chunk_once(chunk).ok_or_else(|| {
+        Err(error) if recoverable_elevenlabs_timing_parent(&error).is_some() => {
+            let effective = recoverable_elevenlabs_timing_parent(&error).unwrap();
+            let (left, right) = split_chunk_once(effective).ok_or_else(|| {
                 "ElevenLabs returned invalid word timing in a short audio chunk. Retry later or inspect this part of the recording.".to_string()
             })?;
             projects::set_transcription_status(
@@ -331,6 +341,13 @@ async fn transcribe_chunk_with_recovery_elevenlabs(
             Ok(words)
         }
         Err(error) => Err(chunk_message(error)),
+    }
+}
+
+fn recoverable_elevenlabs_timing_parent(error: &ChunkFailure) -> Option<AudioChunk> {
+    match error {
+        ChunkFailure::Elevenlabs(ElevenLabsError::InvalidTranscript, effective) => Some(*effective),
+        _ => None,
     }
 }
 
@@ -410,14 +427,14 @@ fn recoverable_timing_parent(chunk: AudioChunk, error: &ChunkFailure) -> Option<
 
 enum ChunkFailure {
     Provider(GeminiError),
-    Elevenlabs(ElevenLabsError),
+    Elevenlabs(ElevenLabsError, AudioChunk),
     Local(String),
 }
 
 fn chunk_message(error: ChunkFailure) -> String {
     match error {
         ChunkFailure::Provider(error) => gemini_message(error),
-        ChunkFailure::Elevenlabs(error) => elevenlabs_message(error),
+        ChunkFailure::Elevenlabs(error, _) => elevenlabs_message(error),
         ChunkFailure::Local(message) => message,
     }
 }
@@ -479,7 +496,7 @@ async fn transcribe_one_chunk_elevenlabs(
     let transcript = client
         .transcribe_wav_chunk(&extracted.path, effective, key, token)
         .await
-        .map_err(ChunkFailure::Elevenlabs)?;
+        .map_err(|error| ChunkFailure::Elevenlabs(error, effective))?;
     Ok(transcript.words)
 }
 
@@ -643,7 +660,7 @@ fn elevenlabs_message(error: ElevenLabsError) -> String {
 mod tests {
     use super::{
         ChunkFailure, duration_milliseconds, effective_audio_chunk, gemini_message,
-        recoverable_timing_parent, split_chunk_once,
+        recoverable_elevenlabs_timing_parent, recoverable_timing_parent, split_chunk_once,
     };
     use crate::transcription::AudioChunk;
     use crate::transcription::TranscriptionError;
@@ -768,5 +785,30 @@ mod tests {
         );
         assert!(effective_audio_chunk(chunk, 0).is_none());
         assert_eq!(effective_audio_chunk(chunk, 15_100).unwrap().end_ms, 15_000);
+    }
+
+    #[test]
+    fn elevenlabs_recovery_splits_the_measured_audio_not_the_video_tail() {
+        let planned = AudioChunk {
+            index: 0,
+            start_ms: 0,
+            end_ms: 900_000,
+            core_start_ms: 0,
+            core_end_ms: 900_000,
+        };
+        let effective = effective_audio_chunk(planned, 120_000).unwrap();
+        let failure = ChunkFailure::Elevenlabs(
+            crate::transcription::elevenlabs::ElevenLabsError::InvalidTranscript,
+            effective,
+        );
+        let retry_parent = recoverable_elevenlabs_timing_parent(&failure).unwrap();
+        let (left, right) = split_chunk_once(retry_parent).unwrap();
+        assert_eq!(left.core_end_ms, 60_000);
+        assert_eq!(right.core_start_ms, 60_000);
+        assert_eq!(right.end_ms, 120_000);
+        assert!(
+            recoverable_elevenlabs_timing_parent(&ChunkFailure::Local("bad extraction".into()))
+                .is_none()
+        );
     }
 }

@@ -51,3 +51,21 @@
 .discovery-empty { padding:18px 0; margin:0; }
 @media(max-width:1100px) { .discovery-list { grid-template-columns:1fr; } }
 @media(max-width:700px) { .discovery-panel,.discovery-results { padding:16px; } .discovery-fields,.discovery-source-player { grid-template-columns:1fr; } .discovery-key-form > div { flex-wrap:wrap; } .discovery-key-form input { flex-basis:100%; } }
+
+.discovery-workspace.has-suggestions { display:flex; flex-direction:column; gap:20px; }
+.discovery-workspace.has-suggestions .section-title { order:-2; margin-bottom:0; }
+.discovery-workspace.has-suggestions .discovery-results { order:-1; margin-top:0; padding:0; border:0; border-radius:0; background:transparent; }
+.discovery-workspace.has-suggestions .discovery-panel { margin-top:4px; }
+.discovery-workspace .discovery-results-head { align-items:center; padding-bottom:14px; border-bottom:1px solid #e9eef529; }
+.discovery-workspace .discovery-results-head h3 { font-size:14px; }
+.discovery-workspace .discovery-source-player { grid-template-columns:minmax(150px,240px) minmax(0,1fr); margin:0 0 20px; background:#e9eef50b; }
+.discovery-workspace .discovery-list { grid-template-columns:minmax(0,1fr); gap:12px; }
+.discovery-workspace .discovery-suggestion { padding:20px 24px; border:1px solid #e9eef529; border-radius:10px; background:#e9eef50a; }
+.discovery-workspace .discovery-suggestion.featured { border-color:#e9eef542; background:#e9eef513; }
+.discovery-workspace .discovery-featured-label { display:inline-flex; align-items:center; gap:6px; margin-bottom:12px; color:var(--accent); font-size:11px; font-weight:600; }
+.discovery-workspace .discovery-suggestion h4 { margin:12px 0; font-size:18px; line-height:1.35; }
+.discovery-workspace .discovery-suggestion blockquote { border-left:0; padding:0; font-size:13px; }
+.discovery-workspace .discovery-suggestion p { margin-top:12px; }
+.discovery-workspace .discovery-range-editor { max-width:420px; }
+.discovery-workspace .discovery-suggestion-actions { justify-content:flex-start; }
+@media(max-width:700px) { .discovery-workspace .discovery-source-player { grid-template-columns:1fr; } .discovery-workspace .discovery-suggestion { padding:16px; } }

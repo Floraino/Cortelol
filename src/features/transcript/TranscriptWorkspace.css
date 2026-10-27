@@ -1,0 +1,18 @@
+.transcript-workspace.has-transcript { display:flex; flex-direction:column; gap:20px; }
+.transcript-workspace.has-transcript .section-title { order:-2; margin-bottom:0; }
+.transcript-workspace.has-transcript .transcript-results { order:-1; margin-top:0; padding:0; border:0; border-radius:0; background:transparent; }
+.transcript-workspace.has-transcript .transcript-panel { margin-top:4px; }
+.transcript-workspace .transcript-results-heading { align-items:center; padding:0 0 16px; border-bottom:1px solid #e9eef529; }
+.transcript-workspace .transcript-results-heading h3 { font-size:14px; }
+.transcript-workspace .transcript-reading { max-height:min(65vh,760px); overflow:auto; padding:8px 2px 8px 0; }
+.transcript-workspace .transcript-line { display:grid; grid-template-columns:72px minmax(0,1fr) auto; align-items:center; gap:18px; width:100%; min-height:48px; margin:2px 0; padding:10px 14px; border:1px solid transparent; border-left:2px solid transparent; border-radius:8px; background:transparent; color:var(--primary); font:inherit; font-size:13px; line-height:1.5; text-align:left; cursor:pointer; }
+.transcript-workspace .transcript-line:hover { background:#e9eef50a; }
+.transcript-workspace .transcript-line.selected { border-left-color:var(--accent); background:#e9eef51a; }
+.transcript-workspace .transcript-line:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+.transcript-workspace .transcript-line time { color:var(--secondary); font-size:11px; font-weight:600; font-variant-numeric:tabular-nums; }
+.transcript-workspace .transcript-line-content { display:flex; align-items:center; flex-wrap:wrap; gap:8px 12px; min-width:0; }
+.transcript-workspace .transcript-line.selected .transcript-line-text { font-weight:600; }
+.transcript-workspace .transcript-line-correction { display:inline-flex; align-items:center; gap:4px; color:var(--success); font-size:10px; }
+.transcript-workspace .transcript-line-speaker { max-width:135px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); font-size:10px; }
+.transcript-workspace .transcript-selected { margin:12px 0 16px; }
+@media(max-width:700px) { .transcript-workspace .transcript-line { grid-template-columns:58px minmax(0,1fr); gap:10px; padding:10px 8px; } .transcript-workspace .transcript-line-speaker { grid-column:2; } }

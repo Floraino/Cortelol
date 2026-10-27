@@ -164,7 +164,7 @@ pub fn render_clip(request: ExportRequest, cancelled: &AtomicBool) -> Result<Pat
         if started.elapsed() > EXPORT_TIMEOUT {
             let _ = child.kill();
             let _ = child.wait();
-            return Err("Export timed out after ten minutes. Try a shorter cut.".into());
+            return Err("Export timed out after thirty minutes. Try a shorter cut.".into());
         }
         if fs::metadata(&temp.0).is_ok_and(|metadata| metadata.len() > MAX_EXPORT_BYTES) {
             let _ = child.kill();
@@ -185,6 +185,9 @@ pub fn render_clip(request: ExportRequest, cancelled: &AtomicBool) -> Result<Pat
         return Err(
             "FFmpeg could not render this clip. Check the recording and export settings.".into(),
         );
+    }
+    if fs::metadata(&temp.0).is_ok_and(|metadata| metadata.len() > MAX_EXPORT_BYTES) {
+        return Err("Export exceeded the 2 GB size limit. Try a shorter cut.".into());
     }
     let file = OpenOptions::new()
         .write(true)
@@ -839,12 +842,12 @@ mod tests {
                 source_path: source,
                 destination_path: output.clone(),
                 range: ClipRange {
-                    start_ms: 0,
-                    end_ms: 1_500,
+                    start_ms: 250,
+                    end_ms: 1_750,
                 },
                 captions: vec![CaptionCue {
-                    start_ms: 0,
-                    end_ms: 1_500,
+                    start_ms: 250,
+                    end_ms: 1_750,
                     text: "Speakers".into(),
                 }],
                 framing: Framing {
@@ -852,17 +855,17 @@ mod tests {
                     horizontal_percent: 0,
                     keyframes: vec![
                         FramingKeyframe {
-                            timestamp_ms: 0,
+                            timestamp_ms: 250,
                             mode: FramingMode::Crop,
                             horizontal_percent: 0,
                         },
                         FramingKeyframe {
-                            timestamp_ms: 500,
+                            timestamp_ms: 750,
                             mode: FramingMode::Fit,
                             horizontal_percent: 50,
                         },
                         FramingKeyframe {
-                            timestamp_ms: 1_000,
+                            timestamp_ms: 1_250,
                             mode: FramingMode::Crop,
                             horizontal_percent: 100,
                         },

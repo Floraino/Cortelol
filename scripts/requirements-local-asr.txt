@@ -1,0 +1,2 @@
+# Optional local transcription dependency for the desktop workflow and standalone script.
+faster-whisper>=1.1,<2

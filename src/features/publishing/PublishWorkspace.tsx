@@ -1,6 +1,7 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { CircleCheck, ExternalLink, RefreshCw, Send, ShieldCheck, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "../../i18n";
 import "./PublishWorkspace.css";
 
 type TikTokPrivacy = "PUBLIC_TO_EVERYONE" | "MUTUAL_FOLLOW_FRIENDS" | "FOLLOWER_OF_CREATOR" | "SELF_ONLY";
@@ -40,18 +41,23 @@ type PublishJob = {
 };
 type Props = { exportPath: string };
 
-function describeError(cause: unknown) {
-  return typeof cause === "string" ? cause : cause instanceof Error ? cause.message : "The publishing request failed.";
+function describeError(cause: unknown, fallback: string) {
+  return typeof cause === "string" ? cause : cause instanceof Error ? cause.message : fallback;
 }
 
-const privacyLabels: Record<TikTokPrivacy, string> = {
-  PUBLIC_TO_EVERYONE: "Everyone",
-  MUTUAL_FOLLOW_FRIENDS: "Friends",
-  FOLLOWER_OF_CREATOR: "Followers",
-  SELF_ONLY: "Only me",
+function exportFileName(path: string, fallback: string) {
+  return path.split(/[\\/]/).pop() || fallback;
+}
+
+const privacyKeys: Record<TikTokPrivacy, string> = {
+  PUBLIC_TO_EVERYONE: "publishing.privacy.everyone",
+  MUTUAL_FOLLOW_FRIENDS: "publishing.privacy.friends",
+  FOLLOWER_OF_CREATOR: "publishing.privacy.followers",
+  SELF_ONLY: "publishing.privacy.onlyMe",
 };
 
 export function PublishWorkspace({ exportPath }: Props) {
+  const { t } = useTranslation();
   const [platform, setPlatform] = useState<"tiktok" | "instagram">("tiktok");
   const [eligibility, setEligibility] = useState<Eligibility | null>(null);
   const [job, setJob] = useState<PublishJob | null>(null);
@@ -77,6 +83,20 @@ export function PublishWorkspace({ exportPath }: Props) {
     setEligibility(null);
     setJob(null);
     setError(null);
+    setPreviewError(false);
+    setWatched(false);
+    setReviewedCaption(false);
+    setReviewedDestination(false);
+    setTransferConsent(false);
+    setTerms(false);
+    setCaption("");
+    setPrivacy("");
+    setAllowComments(false);
+    setAllowDuet(false);
+    setAllowStitch(false);
+    setOwnBrand(false);
+    setBrandedContent(false);
+    setCommercialDisclosure(false);
     void Promise.all([
       invoke<Eligibility>("get_publish_capabilities", { platform }),
       invoke<PublishJob | null>("get_publish_status"),
@@ -94,13 +114,9 @@ export function PublishWorkspace({ exportPath }: Props) {
         setAllowStitch(tiktok.settings.allow_stitch);
         setOwnBrand(tiktok.settings.promotes_own_brand);
         setBrandedContent(tiktok.settings.branded_content);
-        setWatched(false);
-        setReviewedCaption(false);
-        setReviewedDestination(false);
-        setTransferConsent(false);
-        setTerms(false);
+        setCommercialDisclosure(tiktok.settings.promotes_own_brand || tiktok.settings.branded_content);
       }
-    }).catch((cause) => { if (active) setError(describeError(cause)); });
+    }).catch((cause) => { if (active) setError(describeError(cause, t("publishing.the.publishing.request.failed"))); });
     return () => { active = false; };
   }, [platform, exportPath]);
 
@@ -112,7 +128,7 @@ export function PublishWorkspace({ exportPath }: Props) {
         const updated = await invoke<PublishJob | null>("refresh_publish_status");
         if (active) setJob(updated);
       } catch (cause) {
-        if (active) setError(describeError(cause));
+        if (active) setError(describeError(cause, t("publishing.the.publishing.request.failed")));
       }
     };
     const timer = window.setInterval(poll, 6000);
@@ -126,12 +142,15 @@ export function PublishWorkspace({ exportPath }: Props) {
     && !!privacyOptions?.includes(privacy) && !(brandedContent && privacy === "SELF_ONLY")
     && (!commercialDisclosure || ownBrand || brandedContent) && !previewError && allReviewed && !busy
     && job?.state.stage !== "uploading" && job?.state.stage !== "processing";
+  const eligibilityReason = platform === "instagram" ? t("publishing.eligibilityInstagram")
+    : eligibility?.reason?.startsWith("Connect TikTok through an approved app") ? t("publishing.eligibilityTikTok")
+    : eligibility?.reason;
 
   async function refreshEligibility() {
     setError(null);
     setBusy(true);
     try { setEligibility(await invoke<Eligibility>("get_publish_capabilities", { platform })); }
-    catch (cause) { setError(describeError(cause)); }
+    catch (cause) { setError(describeError(cause, t("publishing.the.publishing.request.failed"))); }
     finally { setBusy(false); }
   }
 
@@ -154,7 +173,7 @@ export function PublishWorkspace({ exportPath }: Props) {
         accepted_platform_terms: terms,
       };
       setJob(await invoke<PublishJob>("prepare_publish", { exportPath, metadata, confirmation }));
-    } catch (cause) { setError(describeError(cause)); }
+    } catch (cause) { setError(describeError(cause, t("publishing.the.publishing.request.failed"))); }
     finally { setBusy(false); }
   }
 
@@ -162,73 +181,72 @@ export function PublishWorkspace({ exportPath }: Props) {
     setError(null);
     setBusy(true);
     try { setJob(await invoke<PublishJob>("confirm_publish")); }
-    catch (cause) { setError(describeError(cause)); }
+    catch (cause) { setError(describeError(cause, t("publishing.the.publishing.request.failed"))); }
     finally { setBusy(false); }
   }
 
   async function cancel() {
     setError(null);
     try { await invoke("cancel_publish"); setJob(await invoke<PublishJob | null>("get_publish_status")); }
-    catch (cause) { setError(describeError(cause)); }
+    catch (cause) { setError(describeError(cause, t("publishing.the.publishing.request.failed"))); }
   }
 
   if (eligibility && !eligibility.available) {
-    return <section className="publish-workspace" aria-label="Manual publishing handoff">
-      <div className="section-title"><div><span>05</span><h2>Share your clip</h2></div><small>Upload the reviewed file manually</small></div>
+    return <section className="publish-workspace" aria-label={t("publishing.manual.publishing.handoff")}>
+      <div className="section-title"><div><span>05</span><h2>{t("publishing.share.your.clip")}</h2></div><small>{t("publishing.upload.the.reviewed.file.manually")}</small></div>
       <div className="publish-grid">
-        <div className="publish-preview-panel"><video className="publish-preview" src={convertFileSrc(exportPath)} controls playsInline aria-label="Final exported clip" /><p className="publish-path" title={exportPath}>Local export: {exportPath}</p></div>
-        <div className="publish-review-panel"><h3><Upload size={17} /> Manual upload</h3><label className="publish-field">Platform<select value={platform} onChange={(event) => setPlatform(event.target.value as "tiktok" | "instagram")}><option value="tiktok">TikTok</option><option value="instagram">Instagram Reels</option></select></label><p className="publish-unavailable" role="status">{eligibility.reason}</p><p className="publish-hint">Your MP4 and SRT remain on your device. Review the final video and upload it with the platform's own app.</p><button type="button" className="replace-button" onClick={refreshEligibility} disabled={busy}><RefreshCw size={14} /> Check eligibility again</button></div>
+        <div className="publish-preview-panel"><div className="publish-preview-body"><div className="publish-player-surface"><video className="publish-preview" src={convertFileSrc(exportPath)} controls playsInline aria-label={t("publishing.final.exported.clip")} /></div><div className="publish-artifact-summary"><span className="publish-ready-label"><CircleCheck size={14} /> {t("publishing.ready.for.review")}</span><h3>{exportFileName(exportPath, t("publishing.exported.clip.mp4"))}</h3><p>{t("publishing.mp4.saved.on.this.computer")}</p><p className="publish-path" title={exportPath}>{exportPath}</p></div></div></div>
+        <div className="publish-review-panel"><h3><Upload size={17} /> {t("publishing.manual.upload")}</h3><label className="publish-field">{t("publishing.platform")}<select value={platform} onChange={(event) => setPlatform(event.target.value as "tiktok" | "instagram")}><option value="tiktok">{t("publishing.tiktok")}</option><option value="instagram">{t("publishing.instagram.reels")}</option></select></label><p className="publish-unavailable" role="status">{eligibilityReason}</p><p className="publish-hint">{t("publishing.your.mp4.and.srt.remain")}</p><button type="button" className="replace-button" onClick={refreshEligibility} disabled={busy}><RefreshCw size={14} /> {t("publishing.check.eligibility.again")}</button></div>
       </div>
     </section>;
   }
 
-  return <section className="publish-workspace" aria-label="Review and publish">
-    <div className="section-title"><div><span>05</span><h2>Publish your clip</h2></div><small>Your reviewed MP4 stays on this device</small></div>
+  return <section className="publish-workspace" aria-label={t("publishing.review.and.publish")}>
+    <div className="section-title"><div><span>05</span><h2>{t("publishing.publish.your.clip")}</h2></div><small>{t("publishing.your.reviewed.mp4.stays.on")}</small></div>
     <div className="publish-grid">
       <div className="publish-preview-panel">
-        <video className="publish-preview" src={convertFileSrc(exportPath)} controls playsInline aria-label="Final exported clip" onError={() => { setPreviewError(true); setWatched(false); }} />
-        {previewError && <p className="publish-error" role="alert">The final MP4 cannot be previewed here. Review the local file before preparing a post.</p>}
-        <p className="publish-path" title={exportPath}>Local export: {exportPath}</p>
-        <p className="publish-hint">You can upload this MP4 manually using the platform app whenever direct posting is unavailable.</p>
+        <div className="publish-preview-body"><div className="publish-player-surface"><video className="publish-preview" src={convertFileSrc(exportPath)} controls playsInline aria-label={t("publishing.final.exported.clip")} onError={() => { setPreviewError(true); setWatched(false); }} /></div><div className="publish-artifact-summary"><span className="publish-ready-label"><CircleCheck size={14} /> {t("publishing.ready.for.review")}</span><h3>{exportFileName(exportPath, t("publishing.exported.clip.mp4"))}</h3><p>{t("publishing.mp4.saved.on.this.computer")}</p><p className="publish-path" title={exportPath}>{exportPath}</p></div></div>
+        {previewError && <p className="publish-error" role="alert">{t("publishing.the.final.mp4.cannot.be")}</p>}
+        <p className="publish-hint">{t("publishing.you.can.upload.this.mp4")}</p>
       </div>
       <div className="publish-review-panel">
-        <h3><Upload size={17} /> Destination</h3>
-        <label className="publish-field">Platform<select value={platform} onChange={(event) => { setPlatform(event.target.value as "tiktok" | "instagram"); setJob(null); }}><option value="tiktok">TikTok</option><option value="instagram">Instagram Reels</option></select></label>
-        {eligibility === null ? <p className="publish-hint" role="status">Checking account eligibility…</p> : eligibility.available && caps ? <p className="publish-account"><CircleCheck size={15} /> {caps.display_name} (@{caps.account_id}) · {caps.app_audited ? "Audited app" : "Private posting only until app audit"}</p> : <p className="publish-unavailable" role="status">{eligibility.reason}</p>}
-        <button type="button" className="replace-button" onClick={refreshEligibility} disabled={busy}><RefreshCw size={14} /> Check eligibility again</button>
+        <h3><Upload size={17} /> {t("publishing.destination")}</h3>
+        <label className="publish-field">{t("publishing.platform")}<select value={platform} onChange={(event) => { setPlatform(event.target.value as "tiktok" | "instagram"); setJob(null); }}><option value="tiktok">{t("publishing.tiktok")}</option><option value="instagram">{t("publishing.instagram.reels")}</option></select></label>
+        {eligibility === null ? <p className="publish-hint" role="status">{t("publishing.checking.account.eligibility")}</p> : eligibility.available && caps ? <p className="publish-account"><CircleCheck size={15} /> {caps.display_name} (@{caps.account_id}) · {caps.app_audited ?t("publishing.audited.app") :t("publishing.private.posting.only.until.app")}</p> : <p className="publish-unavailable" role="status">{eligibilityReason}</p>}
+        <button type="button" className="replace-button" onClick={refreshEligibility} disabled={busy}><RefreshCw size={14} /> {t("publishing.check.eligibility.again")}</button>
         {platform === "tiktok" && <>
-          <label className="publish-field">Caption and hashtags<textarea value={caption} maxLength={2200} onChange={(event) => { setCaption(event.target.value); setJob(null); setReviewedCaption(false); }} placeholder="Write the final caption in your own words" /></label>
-          <p className="publish-hint">{[...caption].length} characters. TikTok counts UTF-16 units; the app validates the final value.</p>
-          <label className="publish-field">Visibility<select value={privacy} onChange={(event) => { setPrivacy(event.target.value as TikTokPrivacy | ""); setJob(null); setReviewedDestination(false); }} disabled={!privacyOptions?.length}><option value="">Choose visibility</option>{privacyOptions?.map((choice) => <option key={choice} value={choice}>{privacyLabels[choice]}</option>)}</select></label>
-          <div className="publish-options" aria-label="TikTok interaction settings">
-            <label><input type="checkbox" checked={allowComments} disabled={caps?.comments_disabled} onChange={(event) => { setAllowComments(event.target.checked); setJob(null); setReviewedDestination(false); }} /> Allow comments</label>
-            <label><input type="checkbox" checked={allowDuet} disabled={caps?.duet_disabled} onChange={(event) => { setAllowDuet(event.target.checked); setJob(null); setReviewedDestination(false); }} /> Allow Duet</label>
-            <label><input type="checkbox" checked={allowStitch} disabled={caps?.stitch_disabled} onChange={(event) => { setAllowStitch(event.target.checked); setJob(null); setReviewedDestination(false); }} /> Allow Stitch</label>
-            <label><input type="checkbox" checked={commercialDisclosure} onChange={(event) => { setCommercialDisclosure(event.target.checked); if (!event.target.checked) { setOwnBrand(false); setBrandedContent(false); } setJob(null); setReviewedDestination(false); }} /> This clip promotes a brand, product, or service</label>
+          <label className="publish-field">{t("publishing.caption.and.hashtags")}<textarea value={caption} maxLength={2200} onChange={(event) => { setCaption(event.target.value); setJob(null); setReviewedCaption(false); }} placeholder={t("publishing.write.the.final.caption.in")} /></label>
+          <p className="publish-hint">{t("publishing.captionLength", { count: [...caption].length })}</p>
+          <label className="publish-field">{t("publishing.visibility")}<select value={privacy} onChange={(event) => { setPrivacy(event.target.value as TikTokPrivacy | ""); setJob(null); setReviewedDestination(false); }} disabled={!privacyOptions?.length}><option value="">{t("publishing.choose.visibility")}</option>{privacyOptions?.map((choice) => <option key={choice} value={choice}>{t(privacyKeys[choice])}</option>)}</select></label>
+          <div className="publish-options" aria-label={t("publishing.tiktok.interaction.settings")}>
+            <label><input type="checkbox" checked={allowComments} disabled={caps?.comments_disabled} onChange={(event) => { setAllowComments(event.target.checked); setJob(null); setReviewedDestination(false); }} /> {t("publishing.allow.comments")}</label>
+            <label><input type="checkbox" checked={allowDuet} disabled={caps?.duet_disabled} onChange={(event) => { setAllowDuet(event.target.checked); setJob(null); setReviewedDestination(false); }} /> {t("publishing.allow.duet")}</label>
+            <label><input type="checkbox" checked={allowStitch} disabled={caps?.stitch_disabled} onChange={(event) => { setAllowStitch(event.target.checked); setJob(null); setReviewedDestination(false); }} /> {t("publishing.allow.stitch")}</label>
+            <label><input type="checkbox" checked={commercialDisclosure} onChange={(event) => { setCommercialDisclosure(event.target.checked); if (!event.target.checked) { setOwnBrand(false); setBrandedContent(false); } setJob(null); setReviewedDestination(false); }} /> {t("publishing.this.clip.promotes.a.brand")}</label>
             {commercialDisclosure && <>
-              <label><input type="checkbox" checked={ownBrand} onChange={(event) => { setOwnBrand(event.target.checked); setJob(null); setReviewedDestination(false); }} /> My brand or business</label>
-              <label><input type="checkbox" checked={brandedContent} disabled={privacy === "SELF_ONLY"} onChange={(event) => { setBrandedContent(event.target.checked); setJob(null); setReviewedDestination(false); }} /> Paid partnership with another brand</label>
-              {privacy === "SELF_ONLY" && <p className="publish-hint">Paid partnerships cannot use private visibility.{brandedContent ? " Clear this choice to continue." : ""}</p>}
-              {!ownBrand && !brandedContent && <p className="publish-hint">Choose at least one commercial content category.</p>}
-              {brandedContent && <p className="publish-hint">TikTok will label this clip “Paid partnership”.</p>}
-              {ownBrand && !brandedContent && <p className="publish-hint">TikTok will label this clip “Promotional content”.</p>}
+              <label><input type="checkbox" checked={ownBrand} onChange={(event) => { setOwnBrand(event.target.checked); setJob(null); setReviewedDestination(false); }} /> {t("publishing.my.brand.or.business")}</label>
+              <label><input type="checkbox" checked={brandedContent} disabled={privacy === "SELF_ONLY"} onChange={(event) => { setBrandedContent(event.target.checked); setJob(null); setReviewedDestination(false); }} /> {t("publishing.paid.partnership.with.another.brand")}</label>
+              {privacy === "SELF_ONLY" && <p className="publish-hint">{t(brandedContent ? "publishing.clearPrivatePartnership" : "publishing.paid.partnerships.cannot.use.private")}</p>}
+              {!ownBrand && !brandedContent && <p className="publish-hint">{t("publishing.choose.at.least.one.commercial")}</p>}
+              {brandedContent && <p className="publish-hint">{t("publishing.tiktok.will.label.this.clip")}</p>}
+              {ownBrand && !brandedContent && <p className="publish-hint">{t("publishing.tiktok.will.label.this.clip.1")}</p>}
             </>}
           </div>
         </>}
       </div>
     </div>
     <div className="publish-checklist">
-      <h3><ShieldCheck size={17} /> Final review</h3>
-      <label><input type="checkbox" checked={watched} disabled={previewError} onChange={(event) => setWatched(event.target.checked)} /> I watched the final exported video.</label>
-      <label><input type="checkbox" checked={reviewedCaption} onChange={(event) => setReviewedCaption(event.target.checked)} /> I reviewed the caption, hashtags, and claims.</label>
-      <label><input type="checkbox" checked={reviewedDestination} onChange={(event) => setReviewedDestination(event.target.checked)} /> I reviewed the account, visibility, and interaction settings.</label>
-      <label><input type="checkbox" checked={transferConsent} onChange={(event) => setTransferConsent(event.target.checked)} /> I agree to transfer this exported MP4 and caption to TikTok for publishing.</label>
-      <label><input type="checkbox" checked={terms} onChange={(event) => setTerms(event.target.checked)} /> By posting, I agree to TikTok's <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noreferrer">Music Usage Confirmation <ExternalLink size={12} /></a>{brandedContent ? <> and <a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noreferrer">Branded Content Policy <ExternalLink size={12} /></a></> : null}.</label>
+      <h3><ShieldCheck size={17} /> {t("publishing.final.review")}</h3>
+      <label><input type="checkbox" checked={watched} disabled={previewError} onChange={(event) => setWatched(event.target.checked)} /> {t("publishing.i.watched.the.final.exported")}</label>
+      <label><input type="checkbox" checked={reviewedCaption} onChange={(event) => setReviewedCaption(event.target.checked)} /> {t("publishing.i.reviewed.the.caption.hashtags")}</label>
+      <label><input type="checkbox" checked={reviewedDestination} onChange={(event) => setReviewedDestination(event.target.checked)} /> {t("publishing.i.reviewed.the.account.visibility")}</label>
+      <label><input type="checkbox" checked={transferConsent} onChange={(event) => setTransferConsent(event.target.checked)} /> {t("publishing.i.agree.to.transfer.this")}</label>
+      <label><input type="checkbox" checked={terms} onChange={(event) => setTerms(event.target.checked)} /> {t("publishing.by.posting.i.agree.to")} <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noreferrer">{t("publishing.music.usage.confirmation")} <ExternalLink size={12} /></a>{brandedContent ? <> {t("publishing.and")} <a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noreferrer">{t("publishing.branded.content.policy")} <ExternalLink size={12} /></a></> : null}.</label>
       <div className="publish-actions">
-        {job?.state.stage === "reviewed" ? <button type="button" className="primary-button" disabled={busy || platform !== "tiktok" || !allReviewed || previewError} onClick={publish}><Send size={15} /> Publish to TikTok</button> : <button type="button" className="replace-button" disabled={!canPrepare} onClick={prepare}>Confirm review</button>}
-        {(job?.state.stage === "draft" || job?.state.stage === "reviewed" || job?.state.stage === "uploading") && <button type="button" className="replace-button" onClick={cancel}>Cancel</button>}
+        {job?.state.stage === "reviewed" ? <button type="button" className="primary-button" disabled={busy || platform !== "tiktok" || !allReviewed || previewError} onClick={publish}><Send size={15} /> {t("publishing.publish.to.tiktok")}</button> : <button type="button" className="replace-button" disabled={!canPrepare} onClick={prepare}>{t("publishing.confirm.review")}</button>}
+        {(job?.state.stage === "draft" || job?.state.stage === "reviewed" || job?.state.stage === "uploading") && <button type="button" className="replace-button" onClick={cancel}>{t("publishing.cancel")}</button>}
       </div>
-      {job && <p className="publish-state" role="status">{job.state.stage === "uploading" ? "Uploading your reviewed MP4 to TikTok…" : job.state.stage === "processing" ? "TikTok is processing the video. Checking status every few seconds…" : job.state.stage === "published" ? `TikTok confirmed publication${job.state.post_id ? ` · Post ${job.state.post_id}` : " · Private post ID is not returned"}.` : job.state.stage === "failed" ? job.state.message : `Publication ${job.state.stage}.`}</p>}
+      {job && <p className="publish-state" role="status">{job.state.stage === "uploading" ?t("publishing.uploading.your.reviewed.mp4.to") : job.state.stage === "processing" ?t("publishing.tiktok.is.processing.the.video") : job.state.stage === "published" ? t("publishing.postConfirmed", { post: job.state.post_id ? t("publishing.postReference", { id: job.state.post_id }) : t("publishing.postIdUnavailable") }) : job.state.stage === "failed" ? job.state.message : t("publishing.publicationStage", { stage: t(`publishing.stage.${job.state.stage}`) })}</p>}
       {error && <p className="publish-error" role="alert">{error}</p>}
     </div>
   </section>;

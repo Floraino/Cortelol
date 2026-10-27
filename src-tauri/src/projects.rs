@@ -14,7 +14,7 @@ use tauri::{AppHandle, Manager};
 
 fn migrate(connection: &Connection) -> rusqlite::Result<()> {
     let version: i64 = connection.pragma_query_value(None, "user_version", |row| row.get(0))?;
-    if version > 10 {
+    if version > 11 {
         return Err(rusqlite::Error::InvalidQuery);
     }
     if version == 0 {
@@ -247,6 +247,70 @@ fn migrate(connection: &Connection) -> rusqlite::Result<()> {
              COMMIT;",
         )?;
     }
+    if version < 11 {
+        // Widen the provider checks while retaining transcript IDs, corrections,
+        // discovery references, and the completed chunk provenance.
+        let foreign_keys: i64 =
+            connection.pragma_query_value(None, "foreign_keys", |row| row.get(0))?;
+        connection.pragma_update(None, "foreign_keys", 0)?;
+        let result = (|| {
+            let transaction = connection.unchecked_transaction()?;
+            transaction.execute_batch(
+                "CREATE TABLE transcription_job_v11 (
+                    source_path TEXT PRIMARY KEY,
+                    duration_seconds REAL NOT NULL CHECK (duration_seconds > 0),
+                    state TEXT NOT NULL CHECK (state IN ('idle', 'running', 'completed', 'cancelled', 'failed')),
+                    stage TEXT NOT NULL,
+                    error TEXT,
+                    source_size_bytes INTEGER,
+                    source_modified_ns TEXT,
+                    provider TEXT NOT NULL DEFAULT 'gemini'
+                        CHECK (provider IN ('gemini', 'elevenlabs', 'local'))
+                );
+                CREATE TABLE transcription_chunk_v11 (
+                    source_path TEXT NOT NULL REFERENCES transcription_job_v11(source_path),
+                    chunk_index INTEGER NOT NULL CHECK (chunk_index >= 0),
+                    start_ms INTEGER NOT NULL,
+                    end_ms INTEGER NOT NULL,
+                    core_start_ms INTEGER NOT NULL,
+                    core_end_ms INTEGER NOT NULL,
+                    completed INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1)),
+                    provider TEXT CHECK (provider IN ('gemini', 'elevenlabs', 'local')),
+                    PRIMARY KEY (source_path, chunk_index),
+                    CHECK (start_ms < end_ms AND start_ms <= core_start_ms AND
+                           core_start_ms < core_end_ms AND core_end_ms <= end_ms)
+                );
+                INSERT INTO transcription_job_v11
+                    (source_path, duration_seconds, state, stage, error,
+                     source_size_bytes, source_modified_ns, provider)
+                    SELECT source_path, duration_seconds, state, stage, error,
+                           source_size_bytes, source_modified_ns, provider
+                    FROM transcription_job;
+                INSERT INTO transcription_chunk_v11
+                    (source_path, chunk_index, start_ms, end_ms, core_start_ms,
+                     core_end_ms, completed, provider)
+                    SELECT source_path, chunk_index, start_ms, end_ms, core_start_ms,
+                           core_end_ms, completed, provider
+                    FROM transcription_chunk;
+                DROP TABLE transcription_chunk;
+                DROP TABLE transcription_job;
+                ALTER TABLE transcription_job_v11 RENAME TO transcription_job;
+                ALTER TABLE transcription_chunk_v11 RENAME TO transcription_chunk;",
+            )?;
+            let invalid_references: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM pragma_foreign_key_check",
+                [],
+                |row| row.get(0),
+            )?;
+            if invalid_references != 0 {
+                return Err(rusqlite::Error::InvalidQuery);
+            }
+            transaction.pragma_update(None, "user_version", 11)?;
+            transaction.commit()
+        })();
+        connection.pragma_update(None, "foreign_keys", foreign_keys)?;
+        result?;
+    }
     Ok(())
 }
 
@@ -259,8 +323,14 @@ fn open_database(app: &AppHandle) -> Result<Connection, String> {
         .map_err(|_| "The project data directory could not be created.".to_string())?;
     let connection = Connection::open(directory.join("projects.sqlite"))
         .map_err(|_| "The project database could not be opened.".to_string())?;
-    migrate(&connection).map_err(|_| "The project database could not be updated.".to_string())?;
+    prepare_database(&connection)
+        .map_err(|_| "The project database could not be updated.".to_string())?;
     Ok(connection)
+}
+
+fn prepare_database(connection: &Connection) -> rusqlite::Result<()> {
+    connection.pragma_update(None, "foreign_keys", "ON")?;
+    migrate(connection)
 }
 
 fn save_recent(connection: &Connection, path: &str) -> rusqlite::Result<()> {
@@ -415,6 +485,7 @@ pub(crate) struct StoredTranscriptSegment {
     pub text: String,
     pub speaker: Option<String>,
     pub corrected: bool,
+    pub provider: Option<TranscriptionProvider>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -540,13 +611,17 @@ fn read_job(
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     let mut segment_statement = connection.prepare(
-        "SELECT id, COALESCE(corrected_start_seconds, original_start_seconds),
-                COALESCE(corrected_end_seconds, original_end_seconds),
-                COALESCE(corrected_text, original_text), speaker,
-                corrected_start_seconds IS NOT NULL OR corrected_end_seconds IS NOT NULL
-                    OR corrected_text IS NOT NULL
-         FROM transcript_segment WHERE source_path = ?1
-         ORDER BY COALESCE(corrected_start_seconds, original_start_seconds), id",
+        "SELECT s.id, COALESCE(s.corrected_start_seconds, s.original_start_seconds),
+                COALESCE(s.corrected_end_seconds, s.original_end_seconds),
+                COALESCE(s.corrected_text, s.original_text), s.speaker,
+                s.corrected_start_seconds IS NOT NULL OR s.corrected_end_seconds IS NOT NULL
+                    OR s.corrected_text IS NOT NULL,
+                c.provider
+         FROM transcript_segment s
+         LEFT JOIN transcription_chunk c ON c.source_path = s.source_path
+             AND c.chunk_index = s.chunk_index
+         WHERE s.source_path = ?1
+         ORDER BY COALESCE(s.corrected_start_seconds, s.original_start_seconds), s.id",
     )?;
     let segments = segment_statement
         .query_map(params![source_path], |row| {
@@ -557,6 +632,13 @@ fn read_job(
                 text: row.get(3)?,
                 speaker: row.get(4)?,
                 corrected: row.get::<_, i64>(5)? != 0,
+                provider: row
+                    .get::<_, Option<String>>(6)?
+                    .map(|provider| {
+                        TranscriptionProvider::from_str(&provider)
+                            .ok_or(rusqlite::Error::InvalidQuery)
+                    })
+                    .transpose()?,
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -2001,12 +2083,12 @@ pub(crate) fn load_completed_export(
 fn import_media_sync(app: AppHandle, path: String) -> Result<MediaInfo, String> {
     let info = probe_media(path)?;
     let connection = open_database(&app)?;
-    save_recent(&connection, &info.path).map_err(|_| {
-        "The recording was read but could not be saved to the project database.".to_string()
-    })?;
     app.asset_protocol_scope()
         .allow_file(&info.path)
         .map_err(|_| "The recording could not be opened for preview.".to_string())?;
+    save_recent(&connection, &info.path).map_err(|_| {
+        "The recording was read but could not be saved to the project database.".to_string()
+    })?;
     Ok(info)
 }
 
@@ -2047,8 +2129,8 @@ mod tests {
         StoredFramingKeyframe, StoredFramingMode, TranscriptionState, append_discovery_result,
         checked_export_path, complete_chunk, create_discovery_job, create_job, edit_segment,
         ensure_source_identity, mark_reviewed, migrate, persist_clip_draft,
-        persist_completed_export, read_clip_draft, read_completed_export, read_discovery_job,
-        read_framing_analysis_mode, read_job, recent_path, review_suggestion,
+        persist_completed_export, prepare_database, read_clip_draft, read_completed_export,
+        read_discovery_job, read_framing_analysis_mode, read_job, recent_path, review_suggestion,
         save_framing_analysis_mode, save_recent, source_identity, update_discovery_status,
     };
     use crate::discovery::ValidatedSuggestion;
@@ -2072,7 +2154,29 @@ mod tests {
             connection
                 .pragma_query_value::<i64, _>(None, "user_version", |row| row.get(0))
                 .unwrap(),
-            10
+            11
+        );
+    }
+
+    #[test]
+    fn project_connections_enforce_foreign_keys() {
+        let connection = Connection::open_in_memory().unwrap();
+        prepare_database(&connection).unwrap();
+        assert_eq!(
+            connection
+                .pragma_query_value::<i64, _>(None, "foreign_keys", |row| row.get(0))
+                .unwrap(),
+            1
+        );
+        assert!(
+            connection
+                .execute(
+                    "INSERT INTO transcription_chunk
+             (source_path, chunk_index, start_ms, end_ms, core_start_ms, core_end_ms)
+             VALUES ('missing.mp4', 0, 0, 1000, 0, 1000)",
+                    [],
+                )
+                .is_err()
         );
     }
 
@@ -2134,7 +2238,7 @@ mod tests {
             connection
                 .pragma_query_value::<i64, _>(None, "user_version", |r| r.get(0))
                 .unwrap(),
-            10
+            11
         );
     }
 
@@ -2212,6 +2316,131 @@ mod tests {
         .unwrap();
         assert_eq!(job.segments.len(), 1);
         assert_eq!(job.segments[0].text, "corrected");
+    }
+
+    #[test]
+    fn transcript_phrases_keep_their_actual_provider_after_resuming_with_another() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        migrate(&connection).unwrap();
+        let chunks = plan_chunks(20_000, 10_000, 0).unwrap();
+        create_job(
+            &mut connection,
+            "C:/mixed.mp4",
+            20.0,
+            &chunks,
+            None,
+            TranscriptionProvider::Gemini,
+        )
+        .unwrap();
+        let job = complete_chunk(
+            &mut connection,
+            "C:/mixed.mp4",
+            0,
+            &[word(1.0, 1.3, "first")],
+            TranscriptionProvider::Gemini,
+        )
+        .unwrap();
+        edit_segment(
+            &connection,
+            "C:/mixed.mp4",
+            job.segments[0].id,
+            "corrected",
+            1.0,
+            1.3,
+        )
+        .unwrap();
+        create_job(
+            &mut connection,
+            "C:/mixed.mp4",
+            20.0,
+            &chunks,
+            None,
+            TranscriptionProvider::Elevenlabs,
+        )
+        .unwrap();
+        let job = complete_chunk(
+            &mut connection,
+            "C:/mixed.mp4",
+            1,
+            &[word(11.0, 11.3, "second")],
+            TranscriptionProvider::Elevenlabs,
+        )
+        .unwrap();
+        assert_eq!(job.provider, TranscriptionProvider::Elevenlabs);
+        assert_eq!(job.segments.len(), 2);
+        assert_eq!(job.segments[0].text, "corrected");
+        assert!(job.segments[0].corrected);
+        assert_eq!(
+            job.segments[0].provider,
+            Some(TranscriptionProvider::Gemini)
+        );
+        assert_eq!(
+            job.segments[1].provider,
+            Some(TranscriptionProvider::Elevenlabs)
+        );
+    }
+
+    #[test]
+    fn local_resume_keeps_cloud_chunks_and_corrections() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        migrate(&connection).unwrap();
+        let chunks = plan_chunks(20_000, 10_000, 0).unwrap();
+        create_job(
+            &mut connection,
+            "C:/cloud-local.mp4",
+            20.0,
+            &chunks,
+            None,
+            TranscriptionProvider::Gemini,
+        )
+        .unwrap();
+        let first = complete_chunk(
+            &mut connection,
+            "C:/cloud-local.mp4",
+            0,
+            &[word(1.0, 1.4, "cloud text")],
+            TranscriptionProvider::Gemini,
+        )
+        .unwrap();
+        edit_segment(
+            &connection,
+            "C:/cloud-local.mp4",
+            first.segments[0].id,
+            "reviewed text",
+            1.0,
+            1.4,
+        )
+        .unwrap();
+        let resumed = create_job(
+            &mut connection,
+            "C:/cloud-local.mp4",
+            20.0,
+            &chunks,
+            None,
+            TranscriptionProvider::Local,
+        )
+        .unwrap();
+        assert_eq!(resumed.completed_chunks, 1);
+        assert_eq!(resumed.segments[0].id, first.segments[0].id);
+        let finished = complete_chunk(
+            &mut connection,
+            "C:/cloud-local.mp4",
+            1,
+            &[word(11.0, 11.4, "local text")],
+            TranscriptionProvider::Local,
+        )
+        .unwrap();
+        assert_eq!(finished.provider, TranscriptionProvider::Local);
+        assert_eq!(finished.segments[0].text, "reviewed text");
+        assert!(finished.segments[0].corrected);
+        assert_eq!(
+            finished.segments[0].provider,
+            Some(TranscriptionProvider::Gemini)
+        );
+        assert_eq!(
+            finished.segments[1].provider,
+            Some(TranscriptionProvider::Local)
+        );
     }
 
     #[test]
@@ -2370,7 +2599,7 @@ mod tests {
             connection
                 .pragma_query_value::<i64, _>(None, "user_version", |row| row.get(0))
                 .unwrap(),
-            10
+            11
         );
     }
 
@@ -2927,7 +3156,7 @@ mod tests {
             connection
                 .pragma_query_value::<i64, _>(None, "user_version", |row| row.get(0))
                 .unwrap(),
-            10
+            11
         );
     }
 
@@ -3026,7 +3255,7 @@ mod tests {
             connection
                 .pragma_query_value::<i64, _>(None, "user_version", |row| row.get(0))
                 .unwrap(),
-            10
+            11
         );
         create_discovery_job(
             &mut connection,
@@ -3202,9 +3431,88 @@ mod tests {
     }
 
     #[test]
+    fn v10_to_v11_keeps_corrections_mixed_providers_and_foreign_keys() {
+        let connection = Connection::open_in_memory().unwrap();
+        connection
+            .execute_batch(
+                "PRAGMA foreign_keys = ON;
+                 CREATE TABLE transcription_job (
+                    source_path TEXT PRIMARY KEY,
+                    duration_seconds REAL NOT NULL CHECK (duration_seconds > 0),
+                    state TEXT NOT NULL CHECK (state IN ('idle', 'running', 'completed', 'cancelled', 'failed')),
+                    stage TEXT NOT NULL, error TEXT, source_size_bytes INTEGER,
+                    source_modified_ns TEXT, provider TEXT NOT NULL DEFAULT 'gemini'
+                        CHECK (provider IN ('gemini', 'elevenlabs'))
+                 );
+                 CREATE TABLE transcription_chunk (
+                    source_path TEXT NOT NULL REFERENCES transcription_job(source_path),
+                    chunk_index INTEGER NOT NULL CHECK (chunk_index >= 0),
+                    start_ms INTEGER NOT NULL, end_ms INTEGER NOT NULL,
+                    core_start_ms INTEGER NOT NULL, core_end_ms INTEGER NOT NULL,
+                    completed INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1)),
+                    provider TEXT CHECK (provider IN ('gemini', 'elevenlabs')),
+                    PRIMARY KEY (source_path, chunk_index),
+                    CHECK (start_ms < end_ms AND start_ms <= core_start_ms AND
+                           core_start_ms < core_end_ms AND core_end_ms <= end_ms)
+                 );
+                 CREATE TABLE transcript_segment (
+                    id INTEGER PRIMARY KEY, source_path TEXT NOT NULL,
+                    chunk_index INTEGER NOT NULL, original_start_seconds REAL NOT NULL,
+                    original_end_seconds REAL NOT NULL, original_text TEXT NOT NULL,
+                    speaker TEXT, corrected_start_seconds REAL,
+                    corrected_end_seconds REAL, corrected_text TEXT,
+                    FOREIGN KEY (source_path, chunk_index)
+                        REFERENCES transcription_chunk(source_path, chunk_index)
+                 );
+                 CREATE TABLE discovery_job (
+                    source_path TEXT NOT NULL REFERENCES transcription_job(source_path),
+                    generation INTEGER NOT NULL, PRIMARY KEY (source_path, generation)
+                 );
+                 INSERT INTO transcription_job VALUES
+                    ('C:/episode.mp4', 40.0, 'completed', 'Done', NULL, 100, '1', 'elevenlabs');
+                 INSERT INTO transcription_chunk VALUES
+                    ('C:/episode.mp4', 0, 0, 21000, 0, 20000, 1, 'gemini'),
+                    ('C:/episode.mp4', 1, 19000, 40000, 20000, 40000, 1, 'elevenlabs');
+                 INSERT INTO transcript_segment VALUES
+                    (42, 'C:/episode.mp4', 0, 1.0, 2.0, 'original', 'Speaker 1',
+                     1.1, 2.1, 'corrected');
+                 INSERT INTO discovery_job VALUES ('C:/episode.mp4', 1);
+                 PRAGMA user_version = 10;",
+            )
+            .unwrap();
+
+        migrate(&connection).unwrap();
+        let job = read_job(&connection, "C:/episode.mp4").unwrap().unwrap();
+        assert_eq!(job.segments[0].id, 42);
+        assert_eq!(job.segments[0].text, "corrected");
+        assert_eq!(
+            job.segments[0].provider,
+            Some(TranscriptionProvider::Gemini)
+        );
+        assert_eq!(
+            job.chunks[1].provider,
+            Some(TranscriptionProvider::Elevenlabs)
+        );
+        assert_eq!(
+            connection
+                .query_row("SELECT COUNT(*) FROM pragma_foreign_key_check", [], |row| {
+                    row.get::<_, i64>(0)
+                })
+                .unwrap(),
+            0
+        );
+        connection
+            .execute("UPDATE transcription_job SET provider = 'local' WHERE source_path = 'C:/episode.mp4'", [])
+            .unwrap();
+        connection
+            .execute("UPDATE transcription_chunk SET provider = 'local' WHERE source_path = 'C:/episode.mp4' AND chunk_index = 1", [])
+            .unwrap();
+    }
+
+    #[test]
     fn migration_rejects_future_database_version() {
         let connection = Connection::open_in_memory().unwrap();
-        connection.pragma_update(None, "user_version", 11).unwrap();
+        connection.pragma_update(None, "user_version", 12).unwrap();
         assert!(migrate(&connection).is_err());
     }
 }

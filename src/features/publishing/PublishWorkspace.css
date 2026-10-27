@@ -1,8 +1,14 @@
-.publish-workspace { margin-top: 46px; }
-.publish-grid { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(300px, 1fr); gap: 16px; }
+.publish-workspace { margin-top: 20px; }
+.publish-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.7fr); gap: 16px; }
 .publish-preview-panel, .publish-review-panel, .publish-checklist { border: 1px solid #e9eef529; border-radius: 12px; background: #e9eef507; padding: 20px; min-width: 0; }
-.publish-preview-panel { display: flex; flex-direction: column; align-items: center; }
-.publish-preview { display: block; width: min(100%, 290px); max-height: 510px; aspect-ratio: 9 / 16; background: #000; border-radius: 8px; }
+.publish-preview-panel { display: flex; flex-direction: column; justify-content: center; background: #11151b; }
+.publish-preview-body { display: flex; align-items: center; justify-content: center; gap: clamp(20px, 4vw, 48px); min-height: 380px; }
+.publish-player-surface { flex: none; display: grid; place-items: center; width: min(39%, 240px); min-width: 160px; }
+.publish-preview { display: block; width: 100%; max-height: 430px; aspect-ratio: 9 / 16; background: #000; border: 1px solid #e9eef538; border-radius: 8px; }
+.publish-artifact-summary { min-width: 0; max-width: 220px; }
+.publish-artifact-summary h3 { overflow-wrap: anywhere; margin: 13px 0 9px; font-size: 18px; }
+.publish-artifact-summary > p { color: var(--muted); font-size: 12px; }
+.publish-ready-label { display: inline-flex; align-items: center; gap: 5px; color: var(--success); font-size: 12px; }
 .publish-path { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; }
 .publish-hint { color: var(--muted); font-size: 11px; line-height: 1.55; }
 .publish-review-panel h3, .publish-checklist h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 18px; font-size: 16px; }
@@ -23,4 +29,5 @@
 .publish-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 10px; }
 .publish-state { color: var(--success); font-size: 12px; margin: 5px 0 0; }
 .publish-error { color: var(--error); font-size: 12px; margin: 5px 0 0; }
-@media (max-width: 900px) { .publish-grid { grid-template-columns: 1fr; } .publish-preview { max-height: 350px; } }
+@media (max-width: 900px) { .publish-grid { grid-template-columns: 1fr; } .publish-preview-body { min-height: 300px; } .publish-preview { max-height: 350px; } }
+@media (max-width: 540px) { .publish-preview-body { flex-direction: column; gap: 16px; padding: 12px 0; } .publish-player-surface { width: min(100%, 190px); } .publish-artifact-summary { width: 100%; max-width: none; } }

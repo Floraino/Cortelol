@@ -40,9 +40,9 @@ fn parse_probe_output(
     let streams = probe["streams"]
         .as_array()
         .ok_or_else(|| "The recording has no readable audio or video streams.".to_string())?;
-    let video = streams
-        .iter()
-        .find(|stream| stream["codec_type"] == "video");
+    let video = streams.iter().find(|stream| {
+        stream["codec_type"] == "video" && stream["disposition"]["attached_pic"] != 1
+    });
     let audio = streams
         .iter()
         .find(|stream| stream["codec_type"] == "audio");
@@ -99,7 +99,7 @@ pub fn probe_media(path: String) -> Result<MediaInfo, String> {
             "-v",
             "error",
             "-show_entries",
-            "format=duration:stream=codec_type,width,height,channels",
+            "format=duration:stream=codec_type,width,height,channels:stream_disposition=attached_pic",
             "-of",
             "json",
         ])
@@ -183,5 +183,22 @@ mod tests {
     fn rejects_video_with_invalid_dimensions() {
         let json = br#"{"format":{"duration":"18.0"},"streams":[{"codec_type":"video","width":0,"height":1080},{"codec_type":"audio","channels":2}]}"#;
         assert!(parse_probe_output(Path::new("broken.mp4"), 1000, json).is_err());
+    }
+
+    #[test]
+    fn embedded_album_art_does_not_turn_audio_into_video() {
+        let json = br#"{"format":{"duration":"62.5"},"streams":[{"codec_type":"audio","channels":2},{"codec_type":"video","width":600,"height":600,"disposition":{"attached_pic":1}}]}"#;
+        let media = parse_probe_output(Path::new("episode.mp3"), 1000, json).unwrap();
+        assert!(media.has_audio);
+        assert!(!media.has_video);
+        assert_eq!((media.width, media.height), (None, None));
+    }
+
+    #[test]
+    fn regular_video_is_selected_after_embedded_artwork() {
+        let json = br#"{"format":{"duration":"62.5"},"streams":[{"codec_type":"video","width":600,"height":600,"disposition":{"attached_pic":1}},{"codec_type":"video","width":1920,"height":1080,"disposition":{"attached_pic":0}},{"codec_type":"audio","channels":2}]}"#;
+        let media = parse_probe_output(Path::new("episode.mp4"), 1000, json).unwrap();
+        assert!(media.has_video);
+        assert_eq!((media.width, media.height), (Some(1920), Some(1080)));
     }
 }
