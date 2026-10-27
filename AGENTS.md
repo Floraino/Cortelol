@@ -48,3 +48,9 @@ The import workflow currently requires FFprobe on `PATH`. See `README.md` for se
 - Check the four root documents, then the implementation and official provider documentation.
 - Prefer the smallest change that preserves existing projects and local media.
 - Ask for a product decision when a choice changes user data handling, publishing behavior, platform support, or the agreed PRD scope.
+
+# 08 Release Archive
+- For every new Cortelol release or installer candidate, update the private `Floraino/Cortelol-releases` repository as part of the same release workflow. A local artifact alone is not a completed release handoff.
+- Create a distinct release entry for each candidate; preserve earlier releases. Upload the installer, SHA-256 manifest, required dependency notices and corresponding-source materials, and validation evidence. Split assets that exceed GitHub's per-file limit and include reassembly instructions and checksums.
+- Record the exact Cortelol source commit, installer hash, test results, known limits, and remaining gates in the release notes. Update the private repository README to identify the latest candidate, then verify the uploaded asset sizes and hashes against local files.
+- Keep an unapproved candidate as a private draft. Do not publish it as a public release until the applicable security, license, and acceptance gates in `RELEASE.md` pass.
